@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
 #include "usb_device.h"
 #include "gpio.h"
 
@@ -25,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "string.h"
 #include "stdio.h"
+#include "bmp280.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -34,7 +36,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BMP280_ADDRESS 0x76
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,7 +47,11 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
+BMP280_t Bmp280;
+float Temperature, Pressure;
+uint8_t buffer[64], bufferLenght;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -72,9 +78,10 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init();
+  HAL_Init() ;
 
   /* USER CODE BEGIN Init */
+
 
   /* USER CODE END Init */
 
@@ -88,23 +95,28 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
-  uint32_t LastTick = 0;
-  extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
+  HAL_Delay(500);
+  uint8_t temp = BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS);
+  if (temp)
+	  {
+	  bufferLenght = sprintf((char*)buffer, "BMP280 init failed, error = %d\n\r", temp);
+	  CDC_Transmit_FS(buffer, bufferLenght);
+	  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
-		uint8_t buffer[] = "Hello World\n\r";
-		if ((HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_RESET) & (HAL_GetTick() > (LastTick + 1000))) {
-			LastTick = HAL_GetTick();
-			HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-			CDC_Transmit_FS(buffer, sizeof(buffer));
-		}
 
+		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE);
+		HAL_Delay(500);
+		BMP280_ReadPressureAndTemperature(&Bmp280, &Pressure, &Temperature);
 
+		bufferLenght = sprintf((char*)buffer, ">Temperature = %.1f\n\r>Pressure = %.1f\n\n\r", Temperature, Pressure);
 
+		CDC_Transmit_FS(buffer, bufferLenght);
 
     /* USER CODE END WHILE */
 
