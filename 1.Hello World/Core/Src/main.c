@@ -50,7 +50,7 @@
 extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
 BMP280_t Bmp280;
-float Temperature, Pressure;
+float Temperature, Pressure, Humidity;
 uint8_t buffer[64], bufferLenght;
 /* USER CODE END PV */
 
@@ -78,7 +78,8 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-  HAL_Init() ;
+
+	HAL_Init() ;
 
   /* USER CODE BEGIN Init */
 
@@ -111,12 +112,10 @@ int main(void)
 	while (1) {
 
 		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE);
-		HAL_Delay(500);
-		BMP280_ReadPressureAndTemperature(&Bmp280, &Pressure, &Temperature);
+		HAL_Delay(1000);
+		BMP280_ReadSensorData(&Bmp280, &Pressure, &Temperature, &Humidity);
 
-		bufferLenght = sprintf((char*)buffer, ">Temperature = %.1f\n\r>Pressure = %.1f\n\n\r", Temperature, Pressure);
-
-		CDC_Transmit_FS(buffer, bufferLenght);
+		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
 
     /* USER CODE END WHILE */
 
@@ -171,7 +170,20 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+int _write(int file, char *ptr, int len) {
+    static uint8_t rc = USBD_OK;
 
+    do {
+        rc = CDC_Transmit_FS((uint8_t*)ptr, len);
+    } while (USBD_BUSY == rc);
+
+    if (USBD_FAIL == rc) {
+        /// NOTE: Should never reach here.
+        /// TODO: Handle this error.
+        return 0;
+    }
+    return len;
+}
 /* USER CODE END 4 */
 
 /**

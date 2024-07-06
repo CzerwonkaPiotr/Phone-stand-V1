@@ -63,18 +63,29 @@
 #define	BMP280_DIG_P8		0x9C
 #define	BMP280_DIG_P9		0x9E
 
+#define BMP280_DIG_H1		0xA1
+#define BMP280_DIG_H2		0xE1
+#define BMP280_DIG_H3		0xE3
+#define BMP280_DIG_H4_MSB	0xE4
+#define BMP280_DIG_H4_LSB	0xE5
+#define BMP280_DIG_H5_MSB	0xE5
+#define BMP280_DIG_H5_LSB	0xE6
+#define BMP280_DIG_H6		0xE7
 //
+
 //	Registers
 //
 #define	BMP280_CHIPID			0xD0
 #define	BMP280_VERSION			0xD1
 #define	BMP280_SOFTRESET		0xE0
 #define	BMP280_CAL26			0xE1  // R calibration stored in 0xE1-0xF0
+#define	BMP280_CONTROL_HUM		0xF2
 #define	BMP280_STATUS			0xF3
 #define	BMP280_CONTROL			0xF4
 #define	BMP280_CONFIG			0xF5
 #define	BMP280_PRESSUREDATA		0xF7
 #define	BMP280_TEMPDATA			0xFA
+#define BMP280_HUMDATA			0xFD
 
 //
 //	Control bits
@@ -87,8 +98,10 @@ typedef struct
 	uint8_t				Address;
 
 	// Coefficients for calculations
-	int16_t t2, t3, p2, p3, p4, p5, p6, p7, p8, p9;
+	int16_t t2, t3, p2, p3, p4, p5, p6, p7, p8, p9, h2, h4, h5;
 	uint16_t t1, p1;
+	uint8_t h1, h3;
+	int8_t h6;
 	int32_t t_fine;
 
 }BMP280_t;
@@ -98,8 +111,9 @@ uint8_t BMP280_Init(BMP280_t *bmp, I2C_HandleTypeDef *i2c, uint8_t Address);
 void BMP280_SetMode(BMP280_t *bmp, uint8_t Mode);
 void BMP280_SetTemperatureOversampling(BMP280_t *bmp, uint8_t TOversampling);
 void BMP280_SetPressureOversampling(BMP280_t *bmp, uint8_t POversampling);
+void BMP280_SetHumidityOversampling(BMP280_t *bmp, uint8_t  HOversampling);
 
 float BMP280_ReadTemperature(BMP280_t *bmp);
-uint8_t BMP280_ReadPressureAndTemperature(BMP280_t *bmp, float *Pressure, float *Temperature);
+uint8_t BMP280_ReadSensorData(BMP280_t *bmp, float *Pressure, float *Temperature, float *Humidity);
 
 #endif /* INC_BMP280_H_ */

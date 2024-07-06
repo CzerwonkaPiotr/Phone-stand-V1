@@ -103,6 +103,20 @@ void BMP280_SetTemperatureOversampling(BMP280_t *bmp, uint8_t TOversampling)
 	Write8(bmp, BMP280_CONTROL, Tmp);
 }
 
+void BMP280_SetHumidityOversampling(BMP280_t *bmp, uint8_t  HOversampling)
+{
+	uint8_t Tmp;
+
+		if(HOversampling > 5) HOversampling = 5;
+
+		Tmp = Read8(bmp, BMP280_CONTROL_HUM);
+
+		Tmp = Tmp & 0xF8; // Tmp (xxxx x000)
+		Tmp |= ((HOversampling) & 0x07) ;  // (0000 0111)
+
+		Write8(bmp, BMP280_CONTROL_HUM, Tmp);
+}
+
 //
 // Read Raw temperature data from BMP280
 //
@@ -127,6 +141,18 @@ int32_t BMP280_ReadPressureRaw(BMP280_t *bmp)
 	Tmp = (int32_t)Read24(bmp, BMP280_PRESSUREDATA);
 
 	Tmp >>= 4; // Move 4 left due to such storing (Datasheet).
+
+	return Tmp;
+}
+
+//
+// Read Raw humidity data from BMP280
+//
+int16_t BMP280_ReadHumidityRaw(BMP280_t *bmp)
+{
+	int16_t Tmp;
+
+	Tmp = Read16(bmp, BMP280_HUMDATA);
 
 	return Tmp;
 }
@@ -159,7 +185,7 @@ float BMP280_ReadTemperature(BMP280_t *bmp)
 // Read and calculate temperature & pressure
 // Whole procedure is taken from BMP280 Datasheet
 //
-uint8_t BMP280_ReadPressureAndTemperature(BMP280_t *bmp, float *Pressure, float *Temperature)
+uint8_t BMP280_ReadSensorData(BMP280_t *bmp, float *Pressure, float *Temperature, float *Humidity)
 {
 	// Have to read temperature first
 	*Temperature = BMP280_ReadTemperature(bmp);
@@ -199,8 +225,30 @@ uint8_t BMP280_ReadPressureAndTemperature(BMP280_t *bmp, float *Pressure, float 
 	// Convert Pa to hPa
 	*Pressure = (float)(p/100.0);
 
+	// Raw Humidity from BMP
+	int32_t Humidity_temp = BMP280_ReadHumidityRaw(bmp);
+	// bytes are switched because of opposite register order
+	Humidity_temp = ((Humidity_temp & 0xFF) >> 8)|((Humidity_temp & 0xFF) << 8);
+
+	int32_t vx1;
+
+		vx1  = bmp->t_fine - (int32_t)76800;
+		vx1  = ((((Humidity_temp << 14) - ((int32_t)bmp->h4 << 20) - ((int32_t)bmp->h5 * vx1)) + (int32_t)16384) >> 15) *
+				(((((((vx1 * (int32_t)bmp->h6) >> 10) * (((vx1 * (int32_t)bmp->h3) >> 11) +
+				(int32_t)32768)) >> 10) + (int32_t)2097152) * ((int32_t)bmp->h2) + 8192) >> 14);
+		vx1 -= ((((vx1 >> 15) * (vx1 >> 15)) >> 7) * (int32_t)bmp->h1) >> 4;
+		vx1  = (vx1 < 0) ? 0 : vx1;
+		vx1  = (vx1 > 419430400) ? 419430400 : vx1;
+
+		vx1 = (uint32_t)(vx1 >> 12);
+		*Humidity = (float)(((vx1 >> 10) * 1000) + (((vx1 & 0x3ff) * 976562) / 1000000))/1000;
+		if(*Humidity > 100) *Humidity = 100;
+		if(*Humidity < 0) *Humidity = 0;
+
 	return 0;
 }
+
+//TODO Add function getting sensor data after set time based on oversampling.
 
 //
 // Init
@@ -208,6 +256,11 @@ uint8_t BMP280_ReadPressureAndTemperature(BMP280_t *bmp, float *Pressure, float 
 uint8_t BMP280_Init(BMP280_t *bmp, I2C_HandleTypeDef *i2c, uint8_t Address)
 {
 	uint8_t ChipID;
+
+	int16_t dig_H4_lsb;
+	int16_t dig_H4_msb;
+	int16_t dig_H5_lsb;
+	int16_t dig_H5_msb;
 
 	// Save I2C handler and address
 	bmp->bmp_i2c = i2c;
@@ -237,9 +290,23 @@ uint8_t BMP280_Init(BMP280_t *bmp, I2C_HandleTypeDef *i2c, uint8_t Address)
 	bmp->p8 = Read16(bmp, BMP280_DIG_P8);
 	bmp->p9 = Read16(bmp, BMP280_DIG_P9);
 
+	bmp->h1 = Read8(bmp, BMP280_DIG_H1);
+	bmp->h2 = Read16(bmp, BMP280_DIG_H2);
+	bmp->h3 = Read8(bmp, BMP280_DIG_H3);
+	dig_H4_msb = Read8(bmp, BMP280_DIG_H4_MSB);
+	dig_H4_lsb = Read8(bmp, BMP280_DIG_H4_LSB);
+	dig_H5_msb = Read8(bmp, BMP280_DIG_H5_MSB);
+	dig_H5_lsb = Read8(bmp, BMP280_DIG_H5_LSB);
+	bmp->h6 = Read8(bmp, BMP280_DIG_H6);
+
+	bmp->h4 = (int16_t)((((int8_t)dig_H4_msb) << 4) | (dig_H4_lsb & 0x0f));
+	bmp->h5 = (int16_t)((((int8_t)dig_H5_lsb) << 4) | (dig_H5_msb  >>  4));
+
+
 	// Set base settings
-	BMP280_SetTemperatureOversampling(bmp, BMP280_TEMPERATURE_16BIT);
+	BMP280_SetTemperatureOversampling(bmp, BMP280_ULTRAHIGHRES);
 	BMP280_SetPressureOversampling(bmp, BMP280_ULTRAHIGHRES);
+	BMP280_SetHumidityOversampling(bmp, BMP280_ULTRAHIGHRES);
 	BMP280_SetMode(bmp, BMP280_FORCEDMODE);
 
 	return 0;
