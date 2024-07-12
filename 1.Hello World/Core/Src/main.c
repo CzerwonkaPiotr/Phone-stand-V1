@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c.h"
+#include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
 
@@ -27,6 +28,7 @@
 #include "string.h"
 #include "stdio.h"
 #include "bmp280.h"
+#include "NEO_6M.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,6 +54,10 @@ extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 BMP280_t Bmp280;
 float Temperature, Pressure, Humidity;
 uint8_t buffer[64], bufferLenght;
+
+uint8_t SleepMode = 0, EnableSleepModeChange = 0;
+DateTime currentDateTime;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -78,8 +84,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-
-	HAL_Init() ;
+  HAL_Init();
 
   /* USER CODE BEGIN Init */
 
@@ -97,26 +102,69 @@ int main(void)
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
   MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_Delay(500);
-  uint8_t temp = BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS);
-  if (temp)
-	  {
-	  bufferLenght = sprintf((char*)buffer, "BMP280 init failed, error = %d\n\r", temp);
-	  CDC_Transmit_FS(buffer, bufferLenght);
-	  }
+	HAL_Delay(500);
+	if (BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS)) printf("BMP280 init failed\n\r");
+
+	uint32_t TimerGetGPSData = HAL_GetTick(); // actively scan for gps data
+	uint32_t TimerUpdateGPSData = HAL_GetTick();; // gps data update interval
+	GPS_Init(&huart1);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
 
-		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE);
-		HAL_Delay(1000);
-		BMP280_ReadSensorData(&Bmp280, &Pressure, &Temperature, &Humidity);
+//		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE);
+//		HAL_Delay(1000);
+//		BMP280_ReadSensorData(&Bmp280, &Pressure, &Temperature, &Humidity);
+//
+//		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
 
-		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
+      if (((HAL_GetTick () - TimerGetGPSData) > 100) && dataState == DATA_READY)
+	{
+	  TimerGetGPSData = HAL_GetTick ();
 
+	  gpsDataAcquired = GPS_GetDateTime (&currentDateTime);
+
+	  if (gpsDataAcquired == DATA_ACQUIRED)
+	    {
+	      printf ("\n\r************************************************************************\n\r");
+	      printf ("Date: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
+	      		    currentDateTime.day, currentDateTime.month,
+	      		    currentDateTime.year, currentDateTime.hour,
+	      		    currentDateTime.minute, currentDateTime.second);
+	      printf ("************************************************************************\n\n\r");
+	      GPS_Sleep ();
+	      printf("\n\rSLEEP\n\r");
+
+	      TimerUpdateGPSData = (HAL_GetTick() - 9000);
+	      dataState = NO_DATA_NEEDED;
+	    }
+	  else if (gpsDataAcquired == DATA_NOT_ACQUIRED_NO_FIX)
+	    {
+	      printf ("\n\n\r************************************************************************\n\r");
+	      printf ("GPS DATA NOT ACQUIRED, NO FIX\n\r");
+	      printf ("************************************************************************\n\n\r");
+	      dataState = WAITING_FOR_DATA;
+	    }
+	  else if (gpsDataAcquired == DATA_INCORRECT)
+	    {
+	      printf ("\n\n\r************************************************************************\n\r");
+	      printf ("GPS DATA INCORRECT\n\r");
+	      printf ("************************************************************************\n\n\r");
+	      dataState = WAITING_FOR_DATA;
+	    }
+	}
+      if (((HAL_GetTick () - TimerUpdateGPSData) > 10000) && dataState == NO_DATA_NEEDED)
+      	{
+	  TimerUpdateGPSData = HAL_GetTick ();
+	  dataState = WAITING_FOR_DATA;
+	  printf("\n\rWAKE-UP\n\r");
+	  GPS_Wakeup ();
+      	}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
