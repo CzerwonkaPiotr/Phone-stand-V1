@@ -39,6 +39,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BMP280_ADDRESS 0x76
+#define UTC_UPDATE_INTERVAL 60000 //once a minute
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,9 +55,6 @@ extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 BMP280_t Bmp280;
 float Temperature, Pressure, Humidity;
 uint8_t buffer[64], bufferLenght;
-
-uint8_t SleepMode = 0, EnableSleepModeChange = 0;
-DateTime currentDateTime;
 
 /* USER CODE END PV */
 
@@ -107,15 +105,15 @@ int main(void)
 	HAL_Delay(500);
 	if (BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS)) printf("BMP280 init failed\n\r");
 
-	uint32_t TimerGetGPSData = HAL_GetTick(); // actively scan for gps data
-	uint32_t TimerUpdateGPSData = HAL_GetTick();; // gps data update interval
-	GPS_Init(&huart1);
+
+	GPS_Init(&huart1, UTC_UPDATE_INTERVAL);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	while (1) {
+  while (1)
+    {
 
 //		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE);
 //		HAL_Delay(1000);
@@ -123,48 +121,8 @@ int main(void)
 //
 //		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
 
-      if (((HAL_GetTick () - TimerGetGPSData) > 100) && dataState == DATA_READY)
-	{
-	  TimerGetGPSData = HAL_GetTick ();
+      GPS_RUN ();
 
-	  gpsDataAcquired = GPS_GetDateTime (&currentDateTime);
-
-	  if (gpsDataAcquired == DATA_ACQUIRED)
-	    {
-	      printf ("\n\r************************************************************************\n\r");
-	      printf ("Date: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
-	      		    currentDateTime.day, currentDateTime.month,
-	      		    currentDateTime.year, currentDateTime.hour,
-	      		    currentDateTime.minute, currentDateTime.second);
-	      printf ("************************************************************************\n\n\r");
-	      GPS_Sleep ();
-	      printf("\n\rSLEEP\n\r");
-
-	      TimerUpdateGPSData = (HAL_GetTick() - 9000);
-	      dataState = NO_DATA_NEEDED;
-	    }
-	  else if (gpsDataAcquired == DATA_NOT_ACQUIRED_NO_FIX)
-	    {
-	      printf ("\n\n\r************************************************************************\n\r");
-	      printf ("GPS DATA NOT ACQUIRED, NO FIX\n\r");
-	      printf ("************************************************************************\n\n\r");
-	      dataState = WAITING_FOR_DATA;
-	    }
-	  else if (gpsDataAcquired == DATA_INCORRECT)
-	    {
-	      printf ("\n\n\r************************************************************************\n\r");
-	      printf ("GPS DATA INCORRECT\n\r");
-	      printf ("************************************************************************\n\n\r");
-	      dataState = WAITING_FOR_DATA;
-	    }
-	}
-      if (((HAL_GetTick () - TimerUpdateGPSData) > 10000) && dataState == NO_DATA_NEEDED)
-      	{
-	  TimerUpdateGPSData = HAL_GetTick ();
-	  dataState = WAITING_FOR_DATA;
-	  printf("\n\rWAKE-UP\n\r");
-	  GPS_Wakeup ();
-      	}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
