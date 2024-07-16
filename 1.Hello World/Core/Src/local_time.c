@@ -59,7 +59,7 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
 
   if (checkChangeDate != time->year)
     {
-      for (uint8_t i = 31; i == 25; i--)
+      for (uint8_t i = 31; i >= 25; i--)
 	{
 	  if (DayOfWeek (time->year, 3, i) == 0)
 	    {
@@ -67,7 +67,7 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
 	      break;
 	    }
 	}
-      for (uint8_t i = 31; i == 25; i--)
+      for (uint8_t i = 31; i >= 25; i--)
 	{
 	  if (DayOfWeek (time->year, 10, i) == 0)
 	    {

@@ -26,7 +26,7 @@ typedef struct
 
 //Functions
 // Write
-RB_Status RB_Write (RingBuffer_t *Buf, uint8_t Value);
+RB_Status RB_Write (RingBuffer_t *Buf, uint8_t *Value, uint32_t Length);
 // Read
 RB_Status RB_Read (RingBuffer_t *Buf, uint8_t *Value);
 // Flush

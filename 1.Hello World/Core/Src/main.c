@@ -30,6 +30,8 @@
 #include "stdio.h"
 #include "bmp280.h"
 #include "NEO_6M.h"
+#include "ring_buffer.h"
+#include "parse_commands.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -56,6 +58,13 @@ extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 BMP280_t Bmp280;
 float Temperature, Pressure, Humidity;
 uint8_t buffer[64], bufferLenght;
+
+RingBuffer_t ReceiveBuffer; // Ring Buffer for Receiving from UART
+uint8_t ReceiveTmp; // Temporary variable for receiving one byte
+uint8_t ReceviedLines; // Complete lines counter
+
+uint8_t ReceivedData[32]; // A buffer for parsing
+
 
 /* USER CODE END PV */
 
@@ -137,6 +146,20 @@ int main(void)
 	  	      sTime.Minutes, sTime.Seconds);
 	  lastSec = sTime.Seconds;
 	}
+
+      // Check if there is something to parse - any complete line
+      	  if(ReceviedLines > 0)
+      	  {
+      			// Take one line from the Ring Buffer to work-buffer
+      			Parser_TakeLine(&ReceiveBuffer, ReceivedData);
+
+      			// Decrement complete lines counter
+      			ReceviedLines--;
+
+      			// Run the parser with work-buffer
+      			Parser_Parse(ReceivedData);
+      	  }
+
 
     /* USER CODE END WHILE */
 
@@ -220,6 +243,24 @@ int _write(int file, char *ptr, int len) {
     }
     return len;
 }
+
+void CDC_ReceiveCallback (uint8_t *Buffer, uint8_t Length)
+{
+  if (RB_OK == RB_Write (&ReceiveBuffer, Buffer, Length))
+    {
+      // Check if current byte is the endline char
+      for(uint32_t i = 0; i < Length ; i ++)
+	{
+	  if (Buffer[i] == ENDLINE)
+	    {
+	      // Increment complete lines
+	      ReceviedLines++;
+	    }
+	}
+
+    }
+}
+
 /* USER CODE END 4 */
 
 /**

@@ -39,26 +39,28 @@ RB_Status RB_Read(RingBuffer_t *Buf, uint8_t *Value)
 // RingBuffer_t *Buf - pointer to Ring Buffer structure
 // uint8_t Value - a value to store in the buffer
 //
-RB_Status RB_Write(RingBuffer_t *Buf, uint8_t Value)
+RB_Status RB_Write(RingBuffer_t *Buf, uint8_t *Value, uint32_t Length)
 {
-	// Calculate new Head pointer value
-	uint8_t HeadTmp = (Buf->Head + 1) % RING_BUFFER_SIZE;
+  for (uint32_t i = 0; i < Length; i++)
+    {
+      // Calculate new Head pointer value
+      uint8_t HeadTmp = (Buf->Head + 1) % RING_BUFFER_SIZE;
 
-	// Check if there is one free space ahead the Head buffer
-	if(HeadTmp == Buf->Tail)
+      // Check if there is one free space ahead the Head buffer
+      if (HeadTmp == Buf->Tail)
 	{
-		// There is no space in the buffer - return an error
-		return RB_ERROR;
+	  // There is no space in the buffer - return an error
+	  return RB_ERROR;
 	}
 
-	// Store a value into the buffer
-	Buf->Buffer[Buf->Head] = Value;
+      // Store a value into the buffer
+      Buf->Buffer[Buf->Head] = Value[i];
 
-	// Remember a new Head pointer value
-	Buf->Head = HeadTmp;
-
-	// Everything is ok - return OK status
-	return RB_OK;
+      // Remember a new Head pointer value
+      Buf->Head = HeadTmp;
+    }
+  // Everything is ok - return OK status
+  return RB_OK;
 }
 
 //
