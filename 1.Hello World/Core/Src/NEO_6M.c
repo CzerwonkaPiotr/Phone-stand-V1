@@ -8,6 +8,8 @@
 #include "string.h"
 #include "stdio.h"
 #include "NEO_6M.h"
+#include "local_time.h"
+#include "rtc.h"
 
 #define RX_BUFFER_SIZE 256
 
@@ -85,7 +87,9 @@ GPSDataAcquiredState GPS_GetDateTime (DateTime *datetime)
 	      &datetime->hour, &datetime->minute, &datetime->second, &datetime->day,
 	      &datetime->month, &datetime->year) == 6)
     {
+      LT_SetTime(&hrtc, datetime);
       return DATA_ACQUIRED; // Data is ready to be read
+
     }
   if (strncmp ((char*) sentenceBuffer, "$GPZDA,,,,,00,00", 16) == 0)
     {
@@ -142,12 +146,22 @@ void GPS_RUN (void)
 
   	  if (gpsDataAcquired == DATA_ACQUIRED)
   	    {
-  	      printf ("\n\r************************************************************************\n\r");
-  	      printf ("Date: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
-  	      		    currentDateTime.day, currentDateTime.month,
-  	      		    currentDateTime.year, currentDateTime.hour,
-  	      		    currentDateTime.minute, currentDateTime.second);
-  	      printf ("************************************************************************\n\n\r");
+//  	      printf ("\n\r************************************************************************\n\r");
+//  	      printf ("Date: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
+//  	      		    currentDateTime.day, currentDateTime.month,
+//  	      		    currentDateTime.year, currentDateTime.hour,
+//  	      		    currentDateTime.minute, currentDateTime.second);
+//  	      printf ("************************************************************************\n\n\r");
+  	    RTC_TimeTypeDef sTime;
+  	    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+  	    RTC_DateTypeDef sDate;
+  	    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+  	    printf ("\n\r************************************************************************\n\r");
+	  printf ("Date updated: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
+		  sDate.Date, sDate.Month,
+		  sDate.Year + 2000, sTime.Hours,
+		  sTime.Minutes, sTime.Seconds);
+	  printf ("************************************************************************\n\n\r");
   	      GPS_Sleep ();
   	      printf("\n\rSLEEP\n\r");
 

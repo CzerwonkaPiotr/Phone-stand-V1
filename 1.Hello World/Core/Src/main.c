@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "i2c.h"
+#include "rtc.h"
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
@@ -60,6 +61,7 @@ uint8_t buffer[64], bufferLenght;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -101,13 +103,15 @@ int main(void)
   MX_USB_DEVICE_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
+  MX_RTC_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 	HAL_Delay(500);
 	if (BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS)) printf("BMP280 init failed\n\r");
 
-
 	GPS_Init(&huart1, UTC_UPDATE_INTERVAL);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -120,8 +124,19 @@ int main(void)
 //		BMP280_ReadSensorData(&Bmp280, &Pressure, &Temperature, &Humidity);
 //
 //		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
-
       GPS_RUN ();
+      RTC_TimeTypeDef sTime;
+      HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+      RTC_DateTypeDef sDate;
+      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+      uint8_t lastSec;
+      if(sTime.Seconds != lastSec)
+	{
+	  printf ("Current date and time: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
+	  	      sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours,
+	  	      sTime.Minutes, sTime.Seconds);
+	  lastSec = sTime.Seconds;
+	}
 
     /* USER CODE END WHILE */
 
@@ -147,8 +162,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 25;
@@ -173,6 +189,20 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* OTG_FS_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(OTG_FS_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+  /* USART1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(USART1_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
