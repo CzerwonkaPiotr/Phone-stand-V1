@@ -57,6 +57,30 @@ void GPS_SendCommands (void)
     strcpy ((char*) command, "$PUBX,40,ZDA,0,1,0,0,0,0*45\r\n"); // Turn ZDA ON
     HAL_UART_Transmit (gps_huart, command, strlen ((char*) command),
     HAL_MAX_DELAY);
+
+    //UBX-CFG-PM2 command
+    uint8_t command2[] = {
+        0xB5, 0x62, 0x06, 0x3B, 0x2C, 0x00, 0x01, 0x06,
+        0x00, 0x00, 0x0E, 0x90, 0x40, 0x01, 0xE8, 0x03,
+        0x00, 0x00, 0x10, 0x27, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x2C, 0x01,
+        0x00, 0x00, 0x4F, 0xC1, 0x03, 0x00, 0x87, 0x02,
+        0x00, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x64, 0x40,
+        0x01, 0x00, 0xE4, 0x62
+    };
+    HAL_UART_Transmit (gps_huart, command2, sizeof(command2), HAL_MAX_DELAY);
+
+    //UBG-CFG-GNSS command
+
+    uint8_t command3[] = {
+            0xB5, 0x62, 0x06, 0x3E, 0x24, 0x00, 0x00, 0x00,
+            0xFF, 0x04, 0x00, 0x08, 0xFF, 0x00, 0x01, 0x00,
+            0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x7F, 0xAA
+        };
+        HAL_UART_Transmit (gps_huart, command3, sizeof(command3), HAL_MAX_DELAY);
 }
 void GPS_Init (UART_HandleTypeDef *huart, uint32_t UTC_updInt)
 {
@@ -68,10 +92,14 @@ void GPS_Init (UART_HandleTypeDef *huart, uint32_t UTC_updInt)
 
 void GPS_Sleep (void)
 {
-  //UBX-RXM-PMREQ (Power Mode Request)
+  //UBX-CFG-RXM
   uint8_t command[] =
-      { 0xB5 , 0x62 , 0x02 , 0x41 , 0x08 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x02 , 0x00 , 0x00 , 0x00 , 0x4D , 0x3B };
+        { 0xB5 , 0x62 , 0x06 , 0x11 , 0x02 , 0x00 , 0x00 , 0x01 , 0x22 , 0x92 };
   HAL_UART_Transmit (gps_huart, command, sizeof(command), HAL_MAX_DELAY);
+  //UBX-RXM-PMREQ (Power Mode Request)
+  uint8_t command2[] =
+      { 0xB5 , 0x62 , 0x02 , 0x41 , 0x08 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x02 , 0x00 , 0x00 , 0x00 , 0x4D , 0x3B };
+  HAL_UART_Transmit (gps_huart, command2, sizeof(command2), HAL_MAX_DELAY);
 }
 
 void GPS_Wakeup (void)
@@ -107,7 +135,6 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
     {
       printf ("%c", rx_data); //TODO it's here just for debugging purposes
 
-      \
 
       if (rx_index < RX_BUFFER_SIZE )
 	{
@@ -146,12 +173,6 @@ void GPS_RUN (void)
 
   	  if (gpsDataAcquired == DATA_ACQUIRED)
   	    {
-//  	      printf ("\n\r************************************************************************\n\r");
-//  	      printf ("Date: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
-//  	      		    currentDateTime.day, currentDateTime.month,
-//  	      		    currentDateTime.year, currentDateTime.hour,
-//  	      		    currentDateTime.minute, currentDateTime.second);
-//  	      printf ("************************************************************************\n\n\r");
   	    RTC_TimeTypeDef sTime;
   	    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
   	    RTC_DateTypeDef sDate;

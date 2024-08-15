@@ -42,7 +42,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BMP280_ADDRESS 0x76
-#define UTC_UPDATE_INTERVAL 60000 //once a minute
+#define UTC_UPDATE_INTERVAL 600000 //once a minute
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,7 +63,7 @@ RingBuffer_t ReceiveBuffer; // Ring Buffer for Receiving from UART
 uint8_t ReceiveTmp; // Temporary variable for receiving one byte
 uint8_t ReceviedLines; // Complete lines counter
 
-uint8_t ReceivedData[32]; // A buffer for parsing
+uint8_t ReceivedData[64]; // A buffer for parsing
 
 
 /* USER CODE END PV */
@@ -93,6 +93,7 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -146,7 +147,6 @@ int main(void)
 	  	      sTime.Minutes, sTime.Seconds);
 	  lastSec = sTime.Seconds;
 	}
-
       // Check if there is something to parse - any complete line
       	  if(ReceviedLines > 0)
       	  {

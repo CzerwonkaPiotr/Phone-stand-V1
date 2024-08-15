@@ -2,7 +2,9 @@
  * bmp280.c
  *
  *  Created on: Oct 23, 2020
- *      Author: Mateusz Salamon
+ *      Author: Piotr Czerwonka
+ *
+ *      The actual used sensor is BME280, hence the humidity reading.
  */
 
 #include "main.h"

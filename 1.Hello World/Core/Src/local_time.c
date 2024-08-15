@@ -91,9 +91,10 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
   if (time->hour > 23)
     {
       time->hour = time->hour - 24;
+
       time->day++;
     }
-  if(time->day > listDaysMonths[time->month] ||( time->month == 2 && LeapYear(time->year) == time->day ))
+  if(time->day > listDaysMonths[(time->month)-1] ||( time->month == 2 && time->day < LeapYear(time->year)))
     {
       time->day = 1;
       time->month ++;
@@ -101,17 +102,17 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
   if(time->month > 12)
     {
       time->month = 1;
-	  time->year ++;
+      time->year ++;
     }
   RTC_DateTypeDef sDate;
-  sDate.Year = time->year - 2000;
-  sDate.Month = time->month;
-  sDate.Date = time->day;
+  sDate.Year = (uint8_t)(time->year - 2000);
+  sDate.Month = (uint8_t)time->month;
+  sDate.Date = (uint8_t)time->day;
   sDate.WeekDay = DayOfWeek(time->year, time->month, time->day);
   RTC_TimeTypeDef sTime;
-  sTime.Hours = time->hour;
-  sTime.Minutes = time->minute;
-  sTime.Seconds = time->second;
+  sTime.Hours = (uint8_t)time->hour;
+  sTime.Minutes = (uint8_t)time->minute;
+  sTime.Seconds = (uint8_t)time->second;
 
   HAL_RTC_SetDate(hrtc, &sDate, RTC_FORMAT_BIN);
   HAL_RTC_SetTime(hrtc, &sTime, RTC_FORMAT_BIN);
