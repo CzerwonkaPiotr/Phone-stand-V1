@@ -61,7 +61,7 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
     {
       for (uint8_t i = 31; i >= 25; i--)
 	{
-	  if (DayOfWeek (time->year, 3, i) == 0)
+	  if (DayOfWeek (time->year, 3, i) == 6) // 6 represents sunday
 	    {
 	      marchLastSunday = i;
 	      break;
@@ -69,7 +69,7 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
 	}
       for (uint8_t i = 31; i >= 25; i--)
 	{
-	  if (DayOfWeek (time->year, 10, i) == 0)
+	  if (DayOfWeek (time->year, 10, i) == 6) // 6 represents sunday
 	    {
 	      octoberLastSunday = i;
 	      break;
@@ -116,4 +116,5 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
 
   HAL_RTC_SetDate(hrtc, &sDate, RTC_FORMAT_BIN);
   HAL_RTC_SetTime(hrtc, &sTime, RTC_FORMAT_BIN);
+
 }

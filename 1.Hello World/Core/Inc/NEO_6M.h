@@ -18,31 +18,17 @@ typedef struct {
     int year;
 } DateTime;
 
-
-
 typedef enum {
   NO_DATA_NEEDED = 0,
   WAITING_FOR_DATA = 1,
-  DATA_READY = 2
+  DATA_RECEIVED = 2,
 }GPSGetDataState;
-
-
-
-typedef enum {
-  DATA_ACQUIRED = 0,
-  DATA_NOT_ACQUIRED_NO_FIX = 1,
-  DATA_INCORRECT = 2
-
-}GPSDataAcquiredState;
-
-
 
 void GPS_SendCommands (void);
 void GPS_Init(UART_HandleTypeDef *huart, uint32_t UTC_updInt);
 void GPS_Sleep(void);
 void GPS_Wakeup(void);
-void GPS_RUN (void);
-GPSDataAcquiredState GPS_GetDateTime(DateTime * datetime);
+uint8_t GpsRunSequence (void);
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 #endif /* INC_NEO_6M_H_ */

@@ -17,7 +17,7 @@
 #include "local_time.h"
 
 extern BMP280_t Bmp280;
-extern GPSGetDataState dataState;
+extern GPSGetDataState GPSDataState;
 
 extern RTC_HandleTypeDef hrtc;
 
@@ -154,7 +154,7 @@ static void Parser_ParseGPS(void)
   	}
         else if (strncmp (ParsePointer, "GET_DATA", 8) == 0)
 	{
-            dataState = WAITING_FOR_DATA;
+            GPSDataState = WAITING_FOR_DATA;
 	}
         else if (strncmp (ParsePointer, "DEBUG_MODE_ON", 13) == 0)
   	{

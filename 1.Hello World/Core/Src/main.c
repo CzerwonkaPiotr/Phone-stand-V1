@@ -32,6 +32,7 @@
 #include "NEO_6M.h"
 #include "ring_buffer.h"
 #include "parse_commands.h"
+#include "alarms_rtc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,6 +66,14 @@ uint8_t ReceviedLines; // Complete lines counter
 
 uint8_t ReceivedData[64]; // A buffer for parsing
 
+typedef enum
+{
+  ALARM_ACTIVE = 1,
+  ALARM_INACTIVE = 0
+}ALARM_STATE;
+
+ALARM_STATE AlarmA_active = ALARM_ACTIVE;
+ALARM_STATE AlarmB_active = ALARM_INACTIVE;
 
 /* USER CODE END PV */
 
@@ -93,7 +102,6 @@ int main(void)
   /* MCU Configuration--------------------------------------------------------*/
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
-
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -121,7 +129,7 @@ int main(void)
 	HAL_Delay(500);
 	if (BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS)) printf("BMP280 init failed\n\r");
 
-	GPS_Init(&huart1, UTC_UPDATE_INTERVAL);
+  GPS_Init(&huart1, UTC_UPDATE_INTERVAL);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -129,12 +137,21 @@ int main(void)
   while (1)
     {
 
-//		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE);
+      //
+      //// Alarm A sequence
+      //
+
+      if(AlarmA_active == ALARM_ACTIVE)
+	{
+	  AlarmA_active = GpsRunSequence();
+	}
+      //		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
 //		HAL_Delay(1000);
 //		BMP280_ReadSensorData(&Bmp280, &Pressure, &Temperature, &Humidity);
 //
 //		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
-      GPS_RUN ();
+
+
       RTC_TimeTypeDef sTime;
       HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
       RTC_DateTypeDef sDate;
@@ -147,6 +164,7 @@ int main(void)
 	  	      sTime.Minutes, sTime.Seconds);
 	  lastSec = sTime.Seconds;
 	}
+
       // Check if there is something to parse - any complete line
       	  if(ReceviedLines > 0)
       	  {
@@ -221,11 +239,14 @@ void SystemClock_Config(void)
 static void MX_NVIC_Init(void)
 {
   /* OTG_FS_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(OTG_FS_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(OTG_FS_IRQn, 10, 0);
   HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
   /* USART1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
+  /* RTC_Alarm_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
@@ -257,10 +278,14 @@ void CDC_ReceiveCallback (uint8_t *Buffer, uint8_t Length)
 	      ReceviedLines++;
 	    }
 	}
-
     }
 }
 
+void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
+{
+
+  AlarmA_active = ALARM_ACTIVE;
+}
 /* USER CODE END 4 */
 
 /**

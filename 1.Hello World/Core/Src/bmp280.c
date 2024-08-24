@@ -250,8 +250,6 @@ uint8_t BMP280_ReadSensorData(BMP280_t *bmp, float *Pressure, float *Temperature
 	return 0;
 }
 
-//TODO Add function getting sensor data after set time based on oversampling.
-
 //
 // Init
 //

@@ -10,11 +10,12 @@
 #include "NEO_6M.h"
 #include "local_time.h"
 #include "rtc.h"
+#include "alarms_rtc.h"
 
 #define RX_BUFFER_SIZE 256
 
 static UART_HandleTypeDef *gps_huart;
-static uint8_t sentenceBuffer[RX_BUFFER_SIZE];
+static uint8_t messageBuffer[RX_BUFFER_SIZE];
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
 volatile static uint8_t rx_data;
 static uint8_t rx_index = 0;
@@ -22,9 +23,7 @@ static uint32_t UTC_updateInterval = 0;
 static uint32_t TimerGetGPSData = 0; // actively scan for gps data
 static uint32_t TimerUpdateGPSData = 0; // gps data update interval
 
-DateTime currentDateTime = {0, 0, 0, 0, 0, 0};
-GPSGetDataState dataState = WAITING_FOR_DATA;
-GPSDataAcquiredState gpsDataAcquired = 0;
+GPSGetDataState GPSDataState = WAITING_FOR_DATA;
 
 void GPS_SendCommands (void)
 {
@@ -80,7 +79,7 @@ void GPS_SendCommands (void)
             0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x7F, 0xAA
         };
-        HAL_UART_Transmit (gps_huart, command3, sizeof(command3), HAL_MAX_DELAY);
+    HAL_UART_Transmit (gps_huart, command3, sizeof(command3), HAL_MAX_DELAY);
 }
 void GPS_Init (UART_HandleTypeDef *huart, uint32_t UTC_updInt)
 {
@@ -109,25 +108,9 @@ void GPS_Wakeup (void)
   HAL_UART_Transmit (gps_huart, command, sizeof(command), HAL_MAX_DELAY);
 }
 
-GPSDataAcquiredState GPS_GetDateTime (DateTime *datetime)
-{
-  if (sscanf ((char*) sentenceBuffer, "$GPZDA,%2d%2d%2d.%*2d,%2d,%2d,%4d,%*2d,%*2d",
-	      &datetime->hour, &datetime->minute, &datetime->second, &datetime->day,
-	      &datetime->month, &datetime->year) == 6)
-    {
-      LT_SetTime(&hrtc, datetime);
-      return DATA_ACQUIRED; // Data is ready to be read
-
-    }
-  if (strncmp ((char*) sentenceBuffer, "$GPZDA,,,,,00,00", 16) == 0)
-    {
-      return DATA_NOT_ACQUIRED_NO_FIX; // GPS module has no fix
-    }
-  else
-    {
-      return DATA_INCORRECT;
-    }
-}
+//
+//// Call back from receiving data from UART (UART is only used for GPS data acquiring)
+//
 
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 {
@@ -138,73 +121,100 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 
       if (rx_index < RX_BUFFER_SIZE )
 	{
-	  if(rx_data == '$') rx_index = 0;
+	  if(rx_data == '$') rx_index = 0; 	// $ sign is the beginning of the message, so to index is brought to 0
 	  rx_buffer[rx_index++] = rx_data;
 
-
-	  if ((dataState == WAITING_FOR_DATA) && rx_data == '\n')
+	  if (GPSDataState == WAITING_FOR_DATA && rx_data == '\n') // \n sign signals end of the message
 	    {
-	      rx_buffer[rx_index] = '\0';
+	      rx_buffer[rx_index] = '\0'; 	// replacing \n with \0
 	      rx_index = 0;
 	      if (strncmp ((char*) rx_buffer, "$GPZDA", 6) == 0)
 		{
-		  strcpy((char*)sentenceBuffer,(const char*) rx_buffer);
-		  gpsDataAcquired = GPS_GetDateTime (&currentDateTime);
-		  dataState = DATA_READY;
+		  strcpy ((char*) messageBuffer, (const char*) rx_buffer);
+		  GPSDataState = DATA_RECEIVED;
 		}
 	      else
 		{
-		  GPS_SendCommands();
+		  GPS_SendCommands ();
 		}
+
+	    }
+	  if (strncmp ((char*) rx_buffer, "$GPZDA", 6) != 0 && rx_data == '\n')
+	    {
+	      GPS_SendCommands ();
 	    }
 	}
       else
 	{
 	  rx_index = 0;
 	}
-      HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1);
+      HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1); // setting UART IT capture again
     }
 }
-void GPS_RUN (void)
+uint8_t GpsRunSequence ()
 {
-  if (((HAL_GetTick () - TimerGetGPSData) > 100) && dataState == DATA_READY)
-  	{
-  	  TimerGetGPSData = HAL_GetTick ();
+  if (GPSDataState == NO_DATA_NEEDED)
+    {
+      GPSDataState = WAITING_FOR_DATA;
+    }
+  else if (((HAL_GetTick () - TimerGetGPSData) > 5000)
+      && GPSDataState == WAITING_FOR_DATA)
+    {
+      TimerGetGPSData = HAL_GetTick ();
+      printf ("\n\rGPS WAKE-UP\n\r");
+      GPS_Wakeup ();
+    }
+  else if (GPSDataState == DATA_RECEIVED)
+    {
+      DateTime currentDateTime =
+	{ 0, 0, 0, 0, 0, 0 };
 
-  	  if (gpsDataAcquired == DATA_ACQUIRED)
-  	    {
-  	    RTC_TimeTypeDef sTime;
-  	    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-  	    RTC_DateTypeDef sDate;
-  	    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-  	    printf ("\n\r************************************************************************\n\r");
+      if (sscanf ((char*) messageBuffer,
+		  "$GPZDA,%2d%2d%2d.%*2d,%2d,%2d,%4d,%*2d,%*2d",
+		  &currentDateTime.hour, &currentDateTime.minute,
+		  &currentDateTime.second, &currentDateTime.day,
+		  &currentDateTime.month, &currentDateTime.year) == 6)
+	{
+	  LT_SetTime (&hrtc, &currentDateTime);
+	  SetGPSAlarmADataOk ();
+	  RTC_TimeTypeDef sTime;
+	  HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+	  RTC_DateTypeDef sDate;
+	  HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
+	  printf (
+	      "\n\r************************************************************************\n\r");
 	  printf ("Date updated: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
-		  sDate.Date, sDate.Month,
-		  sDate.Year + 2000, sTime.Hours,
+		  sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours,
 		  sTime.Minutes, sTime.Seconds);
-	  printf ("************************************************************************\n\n\r");
-  	      GPS_Sleep ();
-  	      printf("\n\rSLEEP\n\r");
+	  printf (
+	      "************************************************************************\n\n\r");
+	  GPS_Sleep ();
+	  printf ("\n\rSLEEP\n\r");
 
-  	      TimerUpdateGPSData = HAL_GetTick();
-  	      dataState = NO_DATA_NEEDED;
-  	    }
-  	  else if (gpsDataAcquired == DATA_NOT_ACQUIRED_NO_FIX)
-  	    {
-  	      printf ("GPS DATA NOT ACQUIRED, NO FIX\n\r");
-  	      dataState = WAITING_FOR_DATA;
-  	    }
-  	  else if (gpsDataAcquired == DATA_INCORRECT)
-  	    {
-  	      printf ("GPS DATA INCORRECT\n\r");
-  	      dataState = WAITING_FOR_DATA;
-  	    }
-  	}
-        if (((HAL_GetTick () - TimerUpdateGPSData) > UTC_updateInterval) && dataState == NO_DATA_NEEDED)
-        	{
-  	  TimerUpdateGPSData = HAL_GetTick ();
-  	  dataState = WAITING_FOR_DATA;
-  	  printf("\n\rWAKE-UP\n\r");
-  	  GPS_Wakeup ();
-        	}
+	  TimerUpdateGPSData = HAL_GetTick ();
+	  GPSDataState = NO_DATA_NEEDED;
+	  return 0;
+	}
+      if (strncmp ((char*) messageBuffer, "$GPZDA,,,,,00,00", 16) == 0)
+	{
+	  SetGPSAlarmADataNOk ();
+	  printf (
+	      "\n\r************************************************************************\n\r");
+	  printf ("GPS DATA NOT ACQUIRED, NO FIX\n\r");
+
+	  GPSDataState = NO_DATA_NEEDED;
+	  return 0;
+	}
+      else
+	{
+	  SetGPSAlarmADataNOk ();
+	  printf (
+	      "\n\r************************************************************************\n\r");
+	  printf ("GPS DATA INCORRECT\n\r");
+
+	  GPSDataState = NO_DATA_NEEDED;
+	  return 0;
+	}
+    }
+  return 1;
 }
