@@ -43,7 +43,6 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BMP280_ADDRESS 0x76
-#define UTC_UPDATE_INTERVAL 600000 //once a minute
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -72,8 +71,8 @@ typedef enum
   ALARM_INACTIVE = 0
 }ALARM_STATE;
 
-ALARM_STATE AlarmA_active = ALARM_ACTIVE;
-ALARM_STATE AlarmB_active = ALARM_INACTIVE;
+volatile ALARM_STATE AlarmA_active = ALARM_ACTIVE;
+volatile ALARM_STATE AlarmB_active = ALARM_INACTIVE;
 
 /* USER CODE END PV */
 
@@ -129,7 +128,7 @@ int main(void)
 	HAL_Delay(500);
 	if (BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS)) printf("BMP280 init failed\n\r");
 
-  GPS_Init(&huart1, UTC_UPDATE_INTERVAL);
+  GPS_Init(&huart1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -152,9 +151,9 @@ int main(void)
 //		printf( ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r", Temperature, Pressure, Humidity);
 
 
-      RTC_TimeTypeDef sTime;
+      RTC_TimeTypeDef sTime = { 0 };
       HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-      RTC_DateTypeDef sDate;
+      RTC_DateTypeDef sDate = { 0 };
       HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
       uint8_t lastSec;
       if(sTime.Seconds != lastSec)

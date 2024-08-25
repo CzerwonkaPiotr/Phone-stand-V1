@@ -186,9 +186,9 @@ static void Parser_ParseTIME(void)
         // Check what to do
       if (strncmp (ParsePointer, "GET", 3) == 0)
 	{
-	  RTC_TimeTypeDef sTime;
+	  RTC_TimeTypeDef sTime = { 0 };
 	  HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-	  RTC_DateTypeDef sDate;
+	  RTC_DateTypeDef sDate = { 0 };
 	  HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
 	  printf (
 	      "Current date and time: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
@@ -197,7 +197,7 @@ static void Parser_ParseTIME(void)
 	}
       else if (strncmp (ParsePointer, "SET_TIME", 8) == 0)
 	{
-	  RTC_TimeTypeDef sTime;
+	  RTC_TimeTypeDef sTime = { 0 };
 	  int h, m, s;
 	  if (sscanf ( ParsePointer, "SET_TIME H=%2d M=%2d S=%2d",
 		      &h, &m, &s) == 3)
@@ -217,7 +217,7 @@ static void Parser_ParseTIME(void)
 	}
       else if (strncmp (ParsePointer, "SET_DATE", 8) == 0)
 	{
-	  RTC_DateTypeDef sDate;
+	  RTC_DateTypeDef sDate = { 0 };
 	  int d, m, y;
 	  if (sscanf (ParsePointer, "SET_DATE D=%2d M=%2d Y=%2d",
 		      &d, &m, &y) == 3)
@@ -239,7 +239,7 @@ static void Parser_ParseTIME(void)
 	}
       else if (strncmp (ParsePointer, "SET_UTC_TIME", 8) == 0)
       	{
-      	  DateTime datetime;
+      	  DateTime datetime = { 0 };
       	  int d, mo, y, h, mi, s;
       	  if (sscanf ( ParsePointer, "SET_UTC_TIME D=%2d MO=%2d Y=%2d H=%2d MI=%2d S=%2d",
       		      &d, &mo, &y, &h, &mi, &s) == 6)

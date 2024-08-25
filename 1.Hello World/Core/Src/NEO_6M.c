@@ -19,12 +19,14 @@ static uint8_t messageBuffer[RX_BUFFER_SIZE];
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
 volatile static uint8_t rx_data;
 static uint8_t rx_index = 0;
-static uint32_t UTC_updateInterval = 0;
 static uint32_t TimerGetGPSData = 0; // actively scan for gps data
 static uint32_t TimerUpdateGPSData = 0; // gps data update interval
 
 GPSGetDataState GPSDataState = WAITING_FOR_DATA;
 
+//
+//// Send configuration commands to GPS
+//
 void GPS_SendCommands (void)
 {
     uint8_t command[32];
@@ -57,7 +59,7 @@ void GPS_SendCommands (void)
     HAL_UART_Transmit (gps_huart, command, strlen ((char*) command),
     HAL_MAX_DELAY);
 
-    //UBX-CFG-PM2 command
+    //UBX-CFG-PM2 command, setting low power mode
     uint8_t command2[] = {
         0xB5, 0x62, 0x06, 0x3B, 0x2C, 0x00, 0x01, 0x06,
         0x00, 0x00, 0x0E, 0x90, 0x40, 0x01, 0xE8, 0x03,
@@ -81,13 +83,21 @@ void GPS_SendCommands (void)
         };
     HAL_UART_Transmit (gps_huart, command3, sizeof(command3), HAL_MAX_DELAY);
 }
-void GPS_Init (UART_HandleTypeDef *huart, uint32_t UTC_updInt)
+
+//
+//// GPS init function
+//
+
+void GPS_Init (UART_HandleTypeDef *huart)
 {
-  UTC_updateInterval = UTC_updInt;
   gps_huart = huart;
   HAL_UART_Receive_IT (gps_huart,(uint8_t *) &rx_data, 1);
   GPS_SendCommands();
 }
+
+//
+//// Put GPS module to sleep
+//
 
 void GPS_Sleep (void)
 {
@@ -101,6 +111,10 @@ void GPS_Sleep (void)
   HAL_UART_Transmit (gps_huart, command2, sizeof(command2), HAL_MAX_DELAY);
 }
 
+//
+//// Wake the GPS module up
+//
+
 void GPS_Wakeup (void)
 {
   // just pull RX line high so the module wakes up
@@ -109,14 +123,14 @@ void GPS_Wakeup (void)
 }
 
 //
-//// Call back from receiving data from UART (UART is only used for GPS data acquiring)
+//// Callback from receiving data from UART (UART is only used for GPS communication)
 //
 
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == gps_huart->Instance)
     {
-      printf ("%c", rx_data); //TODO it's here just for debugging purposes
+      //printf ("%c", rx_data); //TODO it's here just for debugging purposes
 
 
       if (rx_index < RX_BUFFER_SIZE )
@@ -126,20 +140,16 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 
 	  if (GPSDataState == WAITING_FOR_DATA && rx_data == '\n') // \n sign signals end of the message
 	    {
-	      rx_buffer[rx_index] = '\0'; 	// replacing \n with \0
+	      rx_buffer[rx_index] = '\0';
 	      rx_index = 0;
 	      if (strncmp ((char*) rx_buffer, "$GPZDA", 6) == 0)
 		{
 		  strcpy ((char*) messageBuffer, (const char*) rx_buffer);
 		  GPSDataState = DATA_RECEIVED;
 		}
-	      else
-		{
-		  GPS_SendCommands ();
-		}
 
 	    }
-	  if (strncmp ((char*) rx_buffer, "$GPZDA", 6) != 0 && rx_data == '\n')
+	  if (strncmp ((char*) rx_buffer, "$GPZDA", 6) != 0 && rx_data == '\n') // If there are unnecessary messages send configure gps
 	    {
 	      GPS_SendCommands ();
 	    }
@@ -151,23 +161,27 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
       HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1); // setting UART IT capture again
     }
 }
+
+//
+//// Main GPS sequence
+//
+
 uint8_t GpsRunSequence ()
 {
   if (GPSDataState == NO_DATA_NEEDED)
     {
       GPSDataState = WAITING_FOR_DATA;
     }
-  else if (((HAL_GetTick () - TimerGetGPSData) > 5000)
-      && GPSDataState == WAITING_FOR_DATA)
+  else if (((HAL_GetTick () - TimerGetGPSData) > 5000) && GPSDataState == WAITING_FOR_DATA)
     {
       TimerGetGPSData = HAL_GetTick ();
       printf ("\n\rGPS WAKE-UP\n\r");
       GPS_Wakeup ();
+      GPS_SendCommands ();
     }
   else if (GPSDataState == DATA_RECEIVED)
     {
-      DateTime currentDateTime =
-	{ 0, 0, 0, 0, 0, 0 };
+      DateTime currentDateTime = { 0 };
 
       if (sscanf ((char*) messageBuffer,
 		  "$GPZDA,%2d%2d%2d.%*2d,%2d,%2d,%4d,%*2d,%*2d",
@@ -177,9 +191,9 @@ uint8_t GpsRunSequence ()
 	{
 	  LT_SetTime (&hrtc, &currentDateTime);
 	  SetGPSAlarmADataOk ();
-	  RTC_TimeTypeDef sTime;
+	  RTC_TimeTypeDef sTime = { 0 };
 	  HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-	  RTC_DateTypeDef sDate;
+	  RTC_DateTypeDef sDate = { 0 };
 	  HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
 	  printf (
 	      "\n\r************************************************************************\n\r");

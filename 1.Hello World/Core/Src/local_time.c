@@ -104,17 +104,15 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
       time->month = 1;
       time->year ++;
     }
-  RTC_DateTypeDef sDate;
+  RTC_DateTypeDef sDate = { 0 };
   sDate.Year = (uint8_t)(time->year - 2000);
   sDate.Month = (uint8_t)time->month;
   sDate.Date = (uint8_t)time->day;
   sDate.WeekDay = DayOfWeek(time->year, time->month, time->day);
-  RTC_TimeTypeDef sTime;
+  RTC_TimeTypeDef sTime = { 0 };
   sTime.Hours = (uint8_t)time->hour;
   sTime.Minutes = (uint8_t)time->minute;
   sTime.Seconds = (uint8_t)time->second;
-
   HAL_RTC_SetDate(hrtc, &sDate, RTC_FORMAT_BIN);
   HAL_RTC_SetTime(hrtc, &sTime, RTC_FORMAT_BIN);
-
 }

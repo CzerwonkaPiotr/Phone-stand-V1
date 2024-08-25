@@ -25,7 +25,7 @@ typedef enum {
 }GPSGetDataState;
 
 void GPS_SendCommands (void);
-void GPS_Init(UART_HandleTypeDef *huart, uint32_t UTC_updInt);
+void GPS_Init(UART_HandleTypeDef *huart);
 void GPS_Sleep(void);
 void GPS_Wakeup(void);
 uint8_t GpsRunSequence (void);
