@@ -235,6 +235,7 @@ uint8_t GpsRunSequence ()
 
 	  GPSDataState = NO_DATA_NEEDED;
 	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
+	  HAL_NVIC_DisableIRQ(USART1_IRQn);
 	  return 0;
 	}
     }

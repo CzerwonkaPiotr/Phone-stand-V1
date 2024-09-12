@@ -10,5 +10,7 @@
 
 void SetGPSAlarmADataOk(void);
 void SetGPSAlarmADataNOk(void);
+void SetGPSAlarmB(void);
+uint8_t Check_RTC_Alarm (void);
 
 #endif /* INC_ALARMS_RTC_H_ */
