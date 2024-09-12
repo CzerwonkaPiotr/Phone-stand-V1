@@ -28,8 +28,8 @@
 /* USER CODE BEGIN Includes */
 #include "string.h"
 #include "stdio.h"
-#include "bmp280.h"
-#include "NEO_6M.h"
+//#include "bmp280.h"
+//#include "NEO_6M.h"
 #include "ring_buffer.h"
 #include "parse_commands.h"
 #include "alarms_rtc.h"
@@ -53,17 +53,21 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
 extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 
+/*
 BMP280_t Bmp280;
 float Temperature, Pressure, Humidity;
-uint8_t buffer[64], bufferLenght;
+*/
+//uint8_t buffer[64], bufferLenght; //TODO not sure if legacy and has to be removed
 
 RingBuffer_t ReceiveBuffer; // Ring Buffer for Receiving from UART
 uint8_t ReceiveTmp; // Temporary variable for receiving one byte
 uint8_t ReceviedLines; // Complete lines counter
 
 uint8_t ReceivedData[64]; // A buffer for parsing
+
 
 typedef enum
 {
@@ -80,7 +84,7 @@ volatile ALARM_STATE AlarmB_active = ALARM_INACTIVE;
 void SystemClock_Config(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
-
+uint8_t Check_RTC_Alarm(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -113,6 +117,8 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
+
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -125,26 +131,56 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-	HAL_Delay(500);
-	if (BMP280_Init(&Bmp280, &hi2c1, BMP280_ADDRESS)) printf("BMP280 init failed\n\r");
+  /* Check and handle if the system was resumed from StandBy mode */
+   if(__HAL_PWR_GET_FLAG(PWR_FLAG_SB) != RESET)
+   {
+     /* Clear Standby flag */
+      __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);
 
-  GPS_Init(&huart1);
+   }
+   /* Disable all used wakeup sources: PWR_WAKEUP_PIN1 */
+   HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
+
+   /* Clear all related wakeup flags*/
+   __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  /**** check alarm wakeup ****/
+    /* read programmed alarm */
+  uint8_t lbSystemWakedUpByRtcAlarm = 0;
+  lbSystemWakedUpByRtcAlarm = Check_RTC_Alarm();
+
+/*
+  HAL_Delay (500);
+  if (BMP280_Init (&Bmp280, &hi2c1, BMP280_ADDRESS))
+    printf ("BMP280 init failed\n\r");
+*/
+
+  //GPS_Init (&huart1);
+  HAL_Delay (500);
+  printf ("Wybudzenie z Standby Mode przez alarm = %d\n\r", lbSystemWakedUpByRtcAlarm);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
     {
+      //TEST
+      	        HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+      	        HAL_Delay(500);
 
       //
       //// Alarm A sequence
       //
 
-      if(AlarmA_active == ALARM_ACTIVE)
+      if (AlarmA_active == ALARM_ACTIVE)
 	{
-	  AlarmA_active = GpsRunSequence();
+	  //AlarmA_active = GpsRunSequence ();
+
 	}
-      //		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
+
+//		BMP280_SetMode(&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
 //		HAL_Delay(1000);
 //		BMP280_ReadSensorData(&Bmp280, &Pressure, &Temperature, &Humidity);
 //
@@ -158,14 +194,14 @@ int main(void)
       uint8_t lastSec;
       if(sTime.Seconds != lastSec)
 	{
-	  printf ("Current date and time: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
+	  printf ("\n\rCurrent date and time: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
 	  	      sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours,
 	  	      sTime.Minutes, sTime.Seconds);
 	  lastSec = sTime.Seconds;
 	}
 
       // Check if there is something to parse - any complete line
-      	  if(ReceviedLines > 0)
+/*      	  if(ReceviedLines > 0)
       	  {
       			// Take one line from the Ring Buffer to work-buffer
       			Parser_TakeLine(&ReceiveBuffer, ReceivedData);
@@ -175,8 +211,30 @@ int main(void)
 
       			// Run the parser with work-buffer
       			Parser_Parse(ReceivedData);
-      	  }
+      	  }*/
+    if (AlarmA_active == ALARM_INACTIVE)
+      {
+	for(uint8_t i = 0; i < 5; i++)
+	  {
+	    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+	    HAL_Delay(100);
+	  }
 
+
+	/* Disable all used wakeup sources: PWR_WAKEUP_PIN2 */
+	  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
+
+	  /* Clear all related wakeup flags*/
+	  __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+
+	  /* Enable WakeUp Pin PWR_WAKEUP_PIN2 connected to PC.13 */
+	  HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
+
+	  /* Enter the Standby mode */
+		SetGPSAlarmADataNOk();
+		printf ("GOING TO STANDBY\n\r");
+	HAL_PWR_EnterSTANDBYMode();
+      }
 
     /* USER CODE END WHILE */
 
@@ -243,9 +301,6 @@ static void MX_NVIC_Init(void)
   /* USART1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
-  /* RTC_Alarm_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
@@ -282,8 +337,57 @@ void CDC_ReceiveCallback (uint8_t *Buffer, uint8_t Length)
 
 void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
 {
-
   AlarmA_active = ALARM_ACTIVE;
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	if(GPIO_Pin == BUTTON1_Pin) // Check if it's our button
+	{
+	    AlarmA_active = ALARM_INACTIVE;
+	}
+	// Clear the EXTI Line 0 flag (for WKUP pin)
+	__HAL_GPIO_EXTI_CLEAR_IT(EXTI_LINE_0);
+}
+
+
+// TEST
+uint8_t Check_RTC_Alarm(void)
+{
+    RTC_TimeTypeDef sTime;   // Struktura przechowująca czas
+    RTC_AlarmTypeDef sAlarm; // Struktura przechowująca alarm
+
+    // Odczyt bieżącego czasu z RTC
+    if (HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
+    {
+        // Obsłuż błąd odczytu czasu
+    }
+
+    // Odczyt bieżącej daty (wymagane, nawet jeśli nie używasz)
+    RTC_DateTypeDef sDate;
+    if (HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN) != HAL_OK)
+    {
+        // Obsłuż błąd odczytu daty
+    }
+
+    // Odczyt alarmu z RTC
+    if (HAL_RTC_GetAlarm(&hrtc, &sAlarm, RTC_ALARM_A, RTC_FORMAT_BIN) != HAL_OK)
+    {
+        // Obsłuż błąd odczytu alarmu
+    }
+
+    // Porównanie godzin, minut i sekund
+    if ((sAlarm.AlarmTime.Hours == sTime.Hours) &&
+        (sAlarm.AlarmTime.Minutes == sTime.Minutes) &&
+        (sAlarm.AlarmTime.Seconds == sTime.Seconds))
+    {
+        // Czas alarmu i bieżący czas są takie same
+	return 1;
+    }
+    else
+    {
+	return 0;
+    }
 }
 /* USER CODE END 4 */
 

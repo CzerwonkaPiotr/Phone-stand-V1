@@ -20,7 +20,6 @@ static uint8_t rx_buffer[RX_BUFFER_SIZE];
 volatile static uint8_t rx_data;
 static uint8_t rx_index = 0;
 static uint32_t TimerGetGPSData = 0; // actively scan for gps data
-static uint32_t TimerUpdateGPSData = 0; // gps data update interval
 
 GPSGetDataState GPSDataState = WAITING_FOR_DATA;
 
@@ -130,7 +129,7 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == gps_huart->Instance)
     {
-      //printf ("%c", rx_data); //TODO it's here just for debugging purposes
+      printf ("%c", rx_data); //TODO it's here just for debugging purposes
 
 
       if (rx_index < RX_BUFFER_SIZE )
@@ -158,7 +157,10 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 	{
 	  rx_index = 0;
 	}
-      HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1); // setting UART IT capture again
+      if (GPSDataState == WAITING_FOR_DATA && rx_data != '\n') // \n sign signals end of the message
+      	    {
+	      HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1); // setting UART IT capture again
+      	    }
     }
 }
 
@@ -170,9 +172,12 @@ uint8_t GpsRunSequence ()
 {
   if (GPSDataState == NO_DATA_NEEDED)
     {
+      __HAL_UART_ENABLE_IT(gps_huart, UART_IT_RXNE);
+      HAL_NVIC_EnableIRQ(USART1_IRQn);
+      HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1); // setting UART IT capture again
       GPSDataState = WAITING_FOR_DATA;
     }
-  else if (((HAL_GetTick () - TimerGetGPSData) > 5000) && GPSDataState == WAITING_FOR_DATA)
+  else if (((HAL_GetTick () - TimerGetGPSData) > 1000) && GPSDataState == WAITING_FOR_DATA)
     {
       TimerGetGPSData = HAL_GetTick ();
       printf ("\n\rGPS WAKE-UP\n\r");
@@ -204,8 +209,8 @@ uint8_t GpsRunSequence ()
 	      "************************************************************************\n\n\r");
 	  GPS_Sleep ();
 	  printf ("\n\rSLEEP\n\r");
-
-	  TimerUpdateGPSData = HAL_GetTick ();
+	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
+	  HAL_NVIC_DisableIRQ(USART1_IRQn);
 	  GPSDataState = NO_DATA_NEEDED;
 	  return 0;
 	}
@@ -215,8 +220,10 @@ uint8_t GpsRunSequence ()
 	  printf (
 	      "\n\r************************************************************************\n\r");
 	  printf ("GPS DATA NOT ACQUIRED, NO FIX\n\r");
-
+	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
+	  HAL_NVIC_DisableIRQ(USART1_IRQn);
 	  GPSDataState = NO_DATA_NEEDED;
+
 	  return 0;
 	}
       else
@@ -227,6 +234,7 @@ uint8_t GpsRunSequence ()
 	  printf ("GPS DATA INCORRECT\n\r");
 
 	  GPSDataState = NO_DATA_NEEDED;
+	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
 	  return 0;
 	}
     }

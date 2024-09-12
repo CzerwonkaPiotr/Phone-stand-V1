@@ -57,7 +57,15 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
+  HAL_PWR_EnableBkUpAccess();
+  __HAL_RCC_RTC_ENABLE();
 
+  // Check if RTC was already initialized
+  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) == 0x5A5AA5A5)
+  {
+      return;
+  }
+  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, 0x5A5AA5A5);
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date
@@ -66,7 +74,7 @@ void MX_RTC_Init(void)
   sTime.Minutes = 0;
   sTime.Seconds = 0;
   sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-  sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+  sTime.StoreOperation = RTC_STOREOPERATION_SET;
   if (HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN) != HAL_OK)
   {
     Error_Handler();
@@ -85,11 +93,11 @@ void MX_RTC_Init(void)
   */
   sAlarm.AlarmTime.Hours = 0;
   sAlarm.AlarmTime.Minutes = 0;
-  sAlarm.AlarmTime.Seconds = 1;
+  sAlarm.AlarmTime.Seconds = 0;
   sAlarm.AlarmTime.SubSeconds = 0;
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
-  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
+  sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_SET;
+  sAlarm.AlarmMask = RTC_ALARMMASK_NONE;
   sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
   sAlarm.AlarmDateWeekDaySel = RTC_ALARMDATEWEEKDAYSEL_WEEKDAY;
   sAlarm.AlarmDateWeekDay = RTC_WEEKDAY_MONDAY;
@@ -125,6 +133,10 @@ void HAL_RTC_MspInit(RTC_HandleTypeDef* rtcHandle)
 
     /* RTC clock enable */
     __HAL_RCC_RTC_ENABLE();
+
+    /* RTC interrupt Init */
+    HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
   /* USER CODE BEGIN RTC_MspInit 1 */
 
   /* USER CODE END RTC_MspInit 1 */

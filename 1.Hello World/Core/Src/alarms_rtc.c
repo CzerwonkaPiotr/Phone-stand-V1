@@ -47,15 +47,25 @@ void SetGPSAlarmADataNOk(void)
 
   /** Enable the Alarm A
    */
-  if(sAlarm.AlarmTime.Minutes>58) {
-      sAlarm.AlarmTime.Minutes=0;
-    }else{
-      sAlarm.AlarmTime.Minutes=sTime.Minutes+1;
-    }
-  sAlarm.AlarmTime.Seconds = 0;
+//  if(sAlarm.AlarmTime.Minutes>58) {
+//      sAlarm.AlarmTime.Minutes=0;
+//    }else{
+//      sAlarm.AlarmTime.Minutes=sTime.Minutes+1;
+//    }
+//  sAlarm.AlarmTime.Seconds = 0;
+
+  //***** TEST ******
+    if(sAlarm.AlarmTime.Seconds>58) {
+        sAlarm.AlarmTime.Seconds= (sAlarm.AlarmTime.Seconds + 10) % 10;
+      }else{
+        sAlarm.AlarmTime.Seconds=sTime.Seconds+10;
+      }
+    //sAlarm.AlarmTime.Minutes = 0;
+  //***** TEST ******
+
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS;
+  sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS|RTC_ALARMMASK_MINUTES;
   sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
   sAlarm.Alarm = RTC_ALARM_A;
   if (HAL_RTC_SetAlarm_IT (&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
