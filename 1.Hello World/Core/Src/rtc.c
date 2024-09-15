@@ -106,6 +106,14 @@ void MX_RTC_Init(void)
   {
     Error_Handler();
   }
+
+  /** Enable the Alarm B
+  */
+  sAlarm.Alarm = RTC_ALARM_B;
+  if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE BEGIN RTC_Init 2 */
 
   /* USER CODE END RTC_Init 2 */
@@ -133,10 +141,6 @@ void HAL_RTC_MspInit(RTC_HandleTypeDef* rtcHandle)
 
     /* RTC clock enable */
     __HAL_RCC_RTC_ENABLE();
-
-    /* RTC interrupt Init */
-    HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
   /* USER CODE BEGIN RTC_MspInit 1 */
 
   /* USER CODE END RTC_MspInit 1 */

@@ -21,7 +21,7 @@ volatile static uint8_t rx_data;
 static uint8_t rx_index = 0;
 static uint32_t TimerGetGPSData = 0; // actively scan for gps data
 
-GPSGetDataState GPSDataState = WAITING_FOR_DATA;
+GPSGetDataState GPSDataState = NO_DATA_NEEDED;
 
 //
 //// Send configuration commands to GPS
@@ -108,6 +108,8 @@ void GPS_Sleep (void)
   uint8_t command2[] =
       { 0xB5 , 0x62 , 0x02 , 0x41 , 0x08 , 0x00 , 0x00 , 0x00 , 0x00 , 0x00 , 0x02 , 0x00 , 0x00 , 0x00 , 0x4D , 0x3B };
   HAL_UART_Transmit (gps_huart, command2, sizeof(command2), HAL_MAX_DELAY);
+
+  printf ("-> GPS sleep\n\r");
 }
 
 //
@@ -119,6 +121,7 @@ void GPS_Wakeup (void)
   // just pull RX line high so the module wakes up
   uint8_t command[] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
   HAL_UART_Transmit (gps_huart, command, sizeof(command), HAL_MAX_DELAY);
+  printf ("-> GPS wake up\n\r");
 }
 
 //
@@ -168,26 +171,27 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 //// Main GPS sequence
 //
 
-uint8_t GpsRunSequence ()
+uint8_t GpsRunSequence (void)
 {
   if (GPSDataState == NO_DATA_NEEDED)
     {
-      __HAL_UART_ENABLE_IT(gps_huart, UART_IT_RXNE);
-      HAL_NVIC_EnableIRQ(USART1_IRQn);
       HAL_UART_Receive_IT (gps_huart, (uint8_t *) &rx_data, 1); // setting UART IT capture again
       GPSDataState = WAITING_FOR_DATA;
+      printf ("-> No GPS data was needed but now it is, turn on IT on UART\n\r");
     }
   else if (((HAL_GetTick () - TimerGetGPSData) > 1000) && GPSDataState == WAITING_FOR_DATA)
     {
       TimerGetGPSData = HAL_GetTick ();
-      printf ("\n\rGPS WAKE-UP\n\r");
+      printf ("-> Waiting for data from GPS\n\r");
       GPS_Wakeup ();
-      GPS_SendCommands ();
+      HAL_UART_Receive_IT (gps_huart,(uint8_t *) &rx_data, 1);
+      //GPS_SendCommands ();
     }
   else if (GPSDataState == DATA_RECEIVED)
     {
+      printf ("-> GPS data received !!!\n\r");
       DateTime currentDateTime = { 0 };
-
+      printf ("-> messageBuffer = %s\n\r", messageBuffer);
       if (sscanf ((char*) messageBuffer,
 		  "$GPZDA,%2d%2d%2d.%*2d,%2d,%2d,%4d,%*2d,%*2d",
 		  &currentDateTime.hour, &currentDateTime.minute,
@@ -200,42 +204,25 @@ uint8_t GpsRunSequence ()
 	  HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
 	  RTC_DateTypeDef sDate = { 0 };
 	  HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
-	  printf (
-	      "\n\r************************************************************************\n\r");
-	  printf ("Date updated: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
+	  printf ("-> Date updated: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
 		  sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours,
 		  sTime.Minutes, sTime.Seconds);
-	  printf (
-	      "************************************************************************\n\n\r");
 	  GPS_Sleep ();
-	  printf ("\n\rSLEEP\n\r");
-	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
-	  HAL_NVIC_DisableIRQ(USART1_IRQn);
 	  GPSDataState = NO_DATA_NEEDED;
 	  return 0;
 	}
       if (strncmp ((char*) messageBuffer, "$GPZDA,,,,,00,00", 16) == 0)
 	{
 	  SetGPSAlarmADataNOk ();
-	  printf (
-	      "\n\r************************************************************************\n\r");
-	  printf ("GPS DATA NOT ACQUIRED, NO FIX\n\r");
-	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
-	  HAL_NVIC_DisableIRQ(USART1_IRQn);
+	  printf ("-> GPS DATA NOT ACQUIRED, NO FIX\n\r");
 	  GPSDataState = NO_DATA_NEEDED;
-
 	  return 0;
 	}
       else
 	{
 	  SetGPSAlarmADataNOk ();
-	  printf (
-	      "\n\r************************************************************************\n\r");
 	  printf ("GPS DATA INCORRECT\n\r");
-
-	  GPSDataState = NO_DATA_NEEDED;
-	  __HAL_UART_DISABLE_IT(gps_huart, UART_IT_RXNE);
-	  HAL_NVIC_DisableIRQ(USART1_IRQn);
+	  GPSDataState = NO_DATA_NEEDED;;
 	  return 0;
 	}
     }

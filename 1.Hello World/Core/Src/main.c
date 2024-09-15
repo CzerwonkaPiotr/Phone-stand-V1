@@ -33,6 +33,7 @@
 #include "ring_buffer.h"
 #include "parse_commands.h"
 #include "alarms_rtc.h"
+#include "button.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -43,6 +44,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define BMP280_ADDRESS 0x76
+#define ALARM_ACTIVE 1
+#define ALARM_INACTIVE 0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -69,14 +72,10 @@ uint8_t ReceviedLines; // Complete lines counter
 uint8_t ReceivedData[64]; // A buffer for parsing
 
 
-typedef enum
-{
-  ALARM_ACTIVE = 1,
-  ALARM_INACTIVE = 0
-}ALARM_STATE;
+volatile uint8_t AlarmA_active = ALARM_INACTIVE;
+volatile uint8_t AlarmB_active = ALARM_INACTIVE;
 
-volatile ALARM_STATE AlarmA_active;
-volatile ALARM_STATE AlarmB_active;
+TButton userButton;
 
 /* USER CODE END PV */
 
@@ -84,6 +83,7 @@ volatile ALARM_STATE AlarmB_active;
 void SystemClock_Config(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -127,9 +127,9 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
+
    if(__HAL_PWR_GET_FLAG(PWR_FLAG_SB) != RESET) // Check and handle if the system was resumed from StandBy mode
    {
-
       __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);  // Clear Standby flag
    }
    else
@@ -143,27 +143,47 @@ int main(void)
    /* Clear all related wakeup flags*/
    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
 
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
   /**** check alarm wakeup ****/
     /* read programmed alarm */
   uint8_t lbSystemWakedUpByRtcAlarm = 0;
   lbSystemWakedUpByRtcAlarm = Check_RTC_Alarm();
 
+  if (lbSystemWakedUpByRtcAlarm == 1 || lbSystemWakedUpByRtcAlarm == 2)
+    {
+      AlarmA_active = ALARM_ACTIVE;
+    }
+  else if (lbSystemWakedUpByRtcAlarm == 3)
+    {
+      AlarmB_active = ALARM_ACTIVE;
+    }
+  else if (lbSystemWakedUpByRtcAlarm == 9)
+      {
+        AlarmA_active = ALARM_ACTIVE;
+        AlarmB_active = ALARM_ACTIVE;
+      }
 
-  HAL_Delay (500);
+
+  HAL_Delay (200);
   if (BMP280_Init (&Bmp280, &hi2c1, BMP280_ADDRESS))
-    printf ("BMP280 init failed\n\r");
+    printf ("-> BMP280 init failed\n\r");
 
+  GPS_Init (&huart1);
+  HAL_Delay (200);
+  printf ("-> Wybudzenie z Standby Mode przez alarm = %d\n\r", lbSystemWakedUpByRtcAlarm);
 
-  //GPS_Init (&huart1);
-  printf ("Wybudzenie z Standby Mode przez alarm = %d\n\r", lbSystemWakedUpByRtcAlarm);
+  ButtonInitKey(&userButton, BUTTON1_GPIO_Port, BUTTON1_Pin, 20, 1000, 500);
+  //ButtonRegisterPressCallback(&userButton, simulateAlarmB); // Register callback for button pressed action
+  //ButtonRegisterLongPressCallback(&userButton, simulateAlarmA); // Register callback for button long press action
+
+  printf ("-> AlarmA_active = %d\n\r->AlarmB_active = %d\n\r", AlarmA_active, AlarmB_active);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
     {
+      ButtonTask(&userButton); // Machine state task for button
 
       //
       //// Alarm A sequence
@@ -174,16 +194,22 @@ int main(void)
 	  AlarmA_active = GpsRunSequence ();
 	}
 
+      //
+      //// Alarm B sequence
+      //
+
       if (AlarmB_active == ALARM_ACTIVE)
      	{
 	  BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
-	  HAL_Delay (1000); // TODO no delays allowed
+	  HAL_Delay (50); // TODO no delays allowed
 	  BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
+	  printf ("-> Odczytano dane z czujnika BME280\n\r");
 
 	  printf (
-	      ">Temperature = %.1f\n\r>Pressure = %.1f\n\r>Humidity = %.1f\n\n\r",
+	      "-> Temperature = %.1f   Pressure = %.1f   Humidity = %.1f\n\r",
 	      Temperature, Pressure, Humidity);
 	  AlarmB_active = ALARM_INACTIVE;
+	  SetGPSAlarmB();
      	}
 
       RTC_TimeTypeDef sTime = { 0 };
@@ -199,8 +225,6 @@ int main(void)
 	  lastSec = sTime.Seconds;
 	}
 
-
-
       // Check if there is something to parse - any complete line
       	  if(ReceviedLines > 0)
       	  {
@@ -213,28 +237,29 @@ int main(void)
       			// Run the parser with work-buffer
       			Parser_Parse(ReceivedData);
       	  }
-    if (AlarmA_active == ALARM_INACTIVE)
+    if (AlarmA_active == ALARM_INACTIVE && AlarmB_active == ALARM_INACTIVE /*&& HAL_GPIO_ReadPin(BUTTON1_GPIO_Port, BUTTON1_Pin) == GPIO_PIN_SET*/)
       {
-	for(uint8_t i = 0; i < 5; i++)
-	  {
-	    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
-	    HAL_Delay(100);
-	  }
+	printf ("-> Going to standby mode\n\r");
+//	for(uint8_t i = 0; i < 5; i++)
+//	  {
+//	    HAL_GPIO_TogglePin(LED1_GPIO_Port, LED1_Pin);
+//	    HAL_Delay(100);
+//	  }
 
 
 	/* Disable all used wakeup sources: PWR_WAKEUP_PIN2 */
 	  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
 
-	  /* Clear all related wakeup flags*/
+	  /* Clear all related wakeup and alar, flags*/
 	  __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+	  __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
 
 	  /* Enable WakeUp Pin PWR_WAKEUP_PIN2 connected to PC.13 */
 	  HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
 
 	  /* Enter the Standby mode */
-		SetGPSAlarmADataNOk();
-		printf ("GOING TO STANDBY\n\r");
-	HAL_PWR_EnterSTANDBYMode();
+	  HAL_Delay(100);
+	  HAL_PWR_EnterSTANDBYMode();
       }
 
     /* USER CODE END WHILE */
@@ -296,12 +321,18 @@ void SystemClock_Config(void)
   */
 static void MX_NVIC_Init(void)
 {
-  /* OTG_FS_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(OTG_FS_IRQn, 10, 0);
-  HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
+  /* EXTI0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
   /* USART1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
+  /* RTC_Alarm_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
+  /* OTG_FS_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(OTG_FS_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(OTG_FS_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
@@ -310,7 +341,7 @@ int _write(int file, char *ptr, int len) {
 
     do {
         rc = CDC_Transmit_FS((uint8_t*)ptr, len);
-    } while (USBD_BUSY == rc);
+    } while (USBD_BUSY == rc );
 
     if (USBD_FAIL == rc) {
         /// NOTE: Should never reach here.
