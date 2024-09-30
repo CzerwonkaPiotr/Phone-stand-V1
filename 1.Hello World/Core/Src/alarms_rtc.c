@@ -38,7 +38,7 @@ void SetGPSAlarmADataOk(void)
     }
   printf ("-> ALARM_A SET (data OK)\n\r");
   printf ("Current time: %d:%d:%d\n\r",sTime.Hours, sTime.Minutes, sTime.Seconds);
-  printf ("AlarmA OK time: %d:%d:%d\n\r",sAlarm.AlarmTime.Hours, sAlarm.AlarmTime.Minutes, sAlarm.AlarmTime.Seconds);
+  printf ("AlarmA OK set time: %d:%d:%d\n\r",sAlarm.AlarmTime.Hours, sAlarm.AlarmTime.Minutes, sAlarm.AlarmTime.Seconds);
 }
 
 void SetGPSAlarmADataNOk(void)
@@ -57,15 +57,15 @@ void SetGPSAlarmADataNOk(void)
 //    }else{
 //      sAlarm.AlarmTime.Minutes=sTime.Minutes+1;
 //    }
-//  sAlarm.AlarmTime.Seconds = 0;
+  sAlarm.AlarmTime.Seconds = sTime.Seconds;
 
-  //***** TEST co 10s ******
-  int alarmIntervalSec = 20; // Max 45
-    if(sTime.Seconds> 60 - alarmIntervalSec - 1) {
-        sAlarm.AlarmTime.Seconds = (sTime.Seconds + alarmIntervalSec) % alarmIntervalSec;
-      }else{
-        sAlarm.AlarmTime.Seconds = sTime.Seconds + alarmIntervalSec;
-      }
+  //***** TEST co X sec ******
+//  int alarmIntervalSec = 20; // Max 45
+//    if(sTime.Seconds> 60 - alarmIntervalSec - 1) {
+//        sAlarm.AlarmTime.Seconds = (sTime.Seconds + alarmIntervalSec) % alarmIntervalSec;
+//      }else{
+//        sAlarm.AlarmTime.Seconds = sTime.Seconds + alarmIntervalSec;
+//      }
   //***** TEST ******
 
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
@@ -79,7 +79,7 @@ void SetGPSAlarmADataNOk(void)
     }
   printf ("-> ALARM_A SET (data NOK)\n\r");
   printf ("Current time: %d:%d:%d\n\r",sTime.Hours, sTime.Minutes, sTime.Seconds);
-  printf ("AlarmA NOK time: %d:%d:%d\n\r",sAlarm.AlarmTime.Hours, sAlarm.AlarmTime.Minutes, sAlarm.AlarmTime.Seconds);
+  printf ("AlarmA NOK set time: %d:%d:%d\n\r",sAlarm.AlarmTime.Hours, sAlarm.AlarmTime.Minutes, sAlarm.AlarmTime.Seconds);
 }
 
 void SetGPSAlarmB(void)
@@ -91,18 +91,11 @@ void SetGPSAlarmB(void)
   HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
-  /** Enable the Alarm B
-   */
-  if(sTime.Minutes>58) {
-        sAlarm.AlarmTime.Minutes = 0;
-      }else{
-        sAlarm.AlarmTime.Minutes = sTime.Minutes+1;
-      }
-    sAlarm.AlarmTime.Seconds = 0;
+  sAlarm.AlarmTime.Seconds = 0;
 
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
-  sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS;
+  sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY|RTC_ALARMMASK_HOURS|RTC_ALARMMASK_MINUTES;
 
   sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
   sAlarm.Alarm = RTC_ALARM_B;
@@ -112,7 +105,7 @@ void SetGPSAlarmB(void)
     }
   printf ("-> ALARM_B SET \n\r");
   printf ("Current time: %d:%d:%d\n\r",sTime.Hours, sTime.Minutes, sTime.Seconds);
-  printf ("AlarmB time: %d:%d:%d\n\r",sAlarm.AlarmTime.Hours, sAlarm.AlarmTime.Minutes, sAlarm.AlarmTime.Seconds);
+  printf ("AlarmB set time: %d:%d:%d\n\r",sAlarm.AlarmTime.Hours, sAlarm.AlarmTime.Minutes, sAlarm.AlarmTime.Seconds);
 }
 
 uint8_t Check_RTC_Alarm (void)

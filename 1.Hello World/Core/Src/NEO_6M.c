@@ -132,7 +132,7 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 {
   if (huart->Instance == gps_huart->Instance)
     {
-      printf ("%c", rx_data); //TODO it's here just for debugging purposes
+      //printf ("%c", rx_data); //TODO it's here just for debugging purposes
 
 
       if (rx_index < RX_BUFFER_SIZE )
