@@ -77,8 +77,8 @@ uint8_t ReceviedLines; // Complete lines counter
 uint8_t ReceivedData[64]; // A buffer for parsing
 
 
-volatile uint8_t AlarmA_active = ALARM_INACTIVE;
-volatile uint8_t AlarmB_active = ALARM_INACTIVE;
+volatile uint8_t AlarmA_active = ALARM_ACTIVE;
+volatile uint8_t AlarmB_active = ALARM_ACTIVE;
 
 TButton userButton;
 
@@ -107,9 +107,6 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
   unsigned char* frame_buffer = (unsigned char*)malloc(EPD_WIDTH * EPD_HEIGHT / 8);
-  char time_string[] = {'0', '0', ':', '0', '0', '\0'};
-    unsigned long time_start_ms;
-    unsigned long time_now_s;
 
   /* USER CODE END 1 */
 
@@ -140,9 +137,12 @@ int main(void)
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
+
    if(__HAL_PWR_GET_FLAG(PWR_FLAG_SB) != RESET) // Check and handle if the system was resumed from StandBy mode
    {
       __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);  // Clear Standby flag
+    /* Clear all related wakeup flags*/
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
    }
    else
      {
@@ -152,24 +152,23 @@ int main(void)
    /* Disable all used wakeup sources: PWR_WAKEUP_PIN1 */
    HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
 
-   /* Clear all related wakeup flags*/
-   __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+   
 
 
   /**** check alarm wakeup ****/
     /* read programmed alarm */
-  uint8_t lbSystemWakedUpByRtcAlarm = 0;
-  lbSystemWakedUpByRtcAlarm = Check_RTC_Alarm();
+  uint8_t wakeUpRoot = 0;
+  wakeUpRoot = Check_RTC_Alarm();
 
-  if (lbSystemWakedUpByRtcAlarm == 1 || lbSystemWakedUpByRtcAlarm == 2)
+  if (wakeUpRoot == 1 || wakeUpRoot == 2)
     {
       AlarmA_active = ALARM_ACTIVE;
     }
-  else if (lbSystemWakedUpByRtcAlarm == 3)
+  else if (wakeUpRoot == 3)
     {
       AlarmB_active = ALARM_ACTIVE;
     }
-  else if (lbSystemWakedUpByRtcAlarm == 9)
+  else if (wakeUpRoot == 9)
       {
         AlarmA_active = ALARM_ACTIVE;
         AlarmB_active = ALARM_ACTIVE;
@@ -177,13 +176,12 @@ int main(void)
 
 
   //HAL_Delay (200);
-  printf ("-> BOOT UP\n\n\n\n");
   if (BMP280_Init (&Bmp280, &hi2c1, BMP280_ADDRESS))
     printf ("-> BMP280 init failed\n\r");
 
   GPS_Init (&huart1);
-  //HAL_Delay (200);
-  printf ("-> Wybudzenie z Standby Mode przez alarm = %d\n\r", lbSystemWakedUpByRtcAlarm);
+//  HAL_Delay (2000);
+
 
   ButtonInitKey(&userButton, BUTTON1_GPIO_Port, BUTTON1_Pin, 20, 1000, 500);
   //ButtonRegisterPressCallback(&userButton, simulateAlarmB); // Register callback for button pressed action
@@ -199,15 +197,29 @@ int main(void)
       return -1;
     }
 
-  Paint paint;
+    Paint paint;
     Paint_Init(&paint, frame_buffer, epd.width, epd.height);
     Paint_Clear(&paint, UNCOLORED);
 
-    /* For simplicity, the arguments are explicit numerical coordinates */
-    /* Write strings to the buffer */
-    Paint_DrawFilledRectangle(&paint, 0, 10, 128, 34, COLORED);
-    Paint_DrawStringAt(&paint, 0, 14, "Hello world!", &Font16, UNCOLORED);
-    Paint_DrawStringAt(&paint, 0, 34, "e-Paper Demo", &Font16, COLORED);
+      switch (wakeUpRoot)
+      {
+        case 0:
+          Paint_DrawStringAt(&paint, 0, 14, "WAKEUP ??? (0)", &Font16, COLORED);
+          break;
+        case 1:
+              Paint_DrawStringAt(&paint, 0, 14, "RTC alarmA", &Font16, COLORED);
+              break;
+        case 2:
+              Paint_DrawStringAt(&paint, 0, 14, "RTC alarmA data NOK", &Font16, COLORED);
+              break;
+        case 3:
+              Paint_DrawStringAt(&paint, 0, 14, "RTC alarmB", &Font16, COLORED);
+              break;
+        case 9:
+      Paint_DrawStringAt (&paint, 0, 14, "RTC alarmB or alarmA", &Font16, COLORED);
+              break;
+      };
+    /* Display the frame_buffer */
 
     /* Draw something to the frame buffer */
     Paint_DrawRectangle(&paint, 16, 60, 56, 110, COLORED);
@@ -217,10 +229,10 @@ int main(void)
     Paint_DrawFilledRectangle(&paint, 16, 130, 56, 180, COLORED);
     Paint_DrawFilledCircle(&paint, 120, 160, 30, COLORED);
 
-    /* Display the frame_buffer */
+
     EPD_SetFrameMemory(&epd, frame_buffer, 0, 0, Paint_GetWidth(&paint), Paint_GetHeight(&paint));
     EPD_DisplayFrame(&epd);
-    EPD_DelayMs(&epd, 2000);
+  //EPD_DelayMs (&epd, 3000);
 
     /**
      *  there are 2 memory areas embedded in the e-paper display
@@ -228,29 +240,7 @@ int main(void)
      *  i.e. the next action of SetFrameMemory will set the other memory area
      *  therefore you have to set the frame memory and refresh the display twice.
      */
-    EPD_ClearFrameMemory(&epd, 0xFF);
-    EPD_DisplayFrame(&epd);
-    EPD_ClearFrameMemory(&epd, 0xFF);
-    EPD_DisplayFrame(&epd);
-
-    /* EPD_or partial update */
-    if (EPD_Init(&epd, lut_partial_update) != 0) {
-      printf("e-Paper init failed\n");
-      return -1;
-    }
-
-    /**
-     *  there are 2 memory areas embedded in the e-paper display
-     *  and once the display is refreshed, the memory area will be auto-toggled,
-     *  i.e. the next action of SetFrameMemory will set the other memory area
-     *  therefore you have to set the frame memory and refresh the display twice.
-     */
-    EPD_SetFrameMemory(&epd, IMAGE_DATA, 0, 0, epd.width, epd.height);
-    EPD_DisplayFrame(&epd);
-    EPD_SetFrameMemory(&epd, IMAGE_DATA, 0, 0, epd.width, epd.height);
-    EPD_DisplayFrame(&epd);
-
-    time_start_ms = HAL_GetTick();
+  
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -258,46 +248,68 @@ int main(void)
   while (1)
     {
       ButtonTask(&userButton); // Machine state task for button
+    HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, SET);
 
       //
       //// Alarm A sequence
       //
 
-//      if (AlarmA_active == ALARM_ACTIVE)
-//	{
-//	  AlarmA_active = GpsRunSequence ();
-//	}
-//
-//      //
-//      //// Alarm B sequence
-//      //
-//
-//      if (AlarmB_active == ALARM_ACTIVE)
-//     	{
-//	  BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
-//	  //HAL_Delay (50); // TODO no delays allowed
-//	  BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
-//	  printf ("-> Odczytano dane z czujnika BME280\n\r");
-//
-//	  printf (
-//	      "-> Temperature = %.1f   Pressure = %.1f   Humidity = %.1f\n\r",
-//	      Temperature, Pressure, Humidity);
-//	  AlarmB_active = ALARM_INACTIVE;
-//	  SetGPSAlarmB();
-//     	}
+    if (AlarmA_active == ALARM_ACTIVE)
+    {
+      AlarmA_active = GpsRunSequence ();
+    }
 
-//      RTC_TimeTypeDef sTime = { 0 };
-//      HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-//      RTC_DateTypeDef sDate = { 0 };
-//      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-//      uint8_t lastSec;
-//      if(sTime.Seconds != lastSec)
-//	{
-//	  printf ("-> Current date and time: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
-//	  	      sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours,
-//	  	      sTime.Minutes, sTime.Seconds);
-//	  lastSec = sTime.Seconds;
-//	}
+    //
+    //// Alarm B sequence
+    //
+
+      if (AlarmB_active == ALARM_ACTIVE)
+    {
+      BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
+      //HAL_Delay (50); // TODO no delays allowed
+      BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
+      //printf ("-> Odczytano dane z czujnika BME280\n\r");
+
+      //printf (
+      //   "-> Temperature = %.1f   Pressure = %.1f   Humidity = %.1f\n\r",
+      //    Temperature, Pressure, Humidity);
+      char atmData[128];
+      Paint_Clear (&paint, UNCOLORED);
+      //HAL_Delay (500);
+      sprintf (atmData, "-> Temperature = %.1f Pressure = %.1f Humidity = %.1f", Temperature, Pressure, Humidity);
+
+      Paint_DrawStringAt (&paint, 0, 14, atmData, &Font8, COLORED);
+      RTC_TimeTypeDef sTime =
+      { 0 };
+      HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+      RTC_DateTypeDef sDate =
+      { 0 };
+      HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
+      sprintf (atmData, "Current date and time: %02d-%02d-%04d", sDate.Date, sDate.Month, sDate.Year + 2000);
+      Paint_DrawStringAt (&paint, 0, 44, atmData, &Font12, COLORED);
+      sprintf (atmData, "Time: %02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
+      Paint_DrawStringAt (&paint, 0, 74, atmData, &Font12, COLORED);
+      EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
+      EPD_DisplayFrame (&epd);
+      //HAL_Delay (500);
+      AlarmB_active = ALARM_INACTIVE;
+
+      SetGPSAlarmB ();
+    }
+
+    RTC_TimeTypeDef sTime =
+    { 0 };
+    HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+    RTC_DateTypeDef sDate =
+    { 0 };
+    HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
+    uint8_t lastSec;
+    if (sTime.Seconds != lastSec)
+    {
+      printf ("-> Current date and time: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r", sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours, sTime.Minutes,
+	      sTime.Seconds);
+      lastSec = sTime.Seconds;
+    }
 
       // Check if there is something to parse - any complete line
       	  if(ReceviedLines > 0)
@@ -311,44 +323,31 @@ int main(void)
       			// Run the parser with work-buffer
       			Parser_Parse(ReceivedData);
       	  }
-//    if (AlarmA_active == ALARM_INACTIVE && AlarmB_active == ALARM_INACTIVE /*&& HAL_GPIO_ReadPin(BUTTON1_GPIO_Port, BUTTON1_Pin) == GPIO_PIN_SET*/)
-//      {
-//	printf ("-> Going to standby mode\n\r");
-//
-//	/* Disable all used wakeup sources: PWR_WAKEUP_PIN2 */
-//	  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
-//
-//	  /* Clear all related wakeup and alar, flags*/
-//	  __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
-//	  __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
-//
-//	  /* Enable WakeUp Pin PWR_WAKEUP_PIN2 connected to PC.13 */
-//	  HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
-//
-//	  /* Enter the Standby mode */
-//	  //HAL_Delay(100);
-//	  HAL_PWR_EnterSTANDBYMode();
-//      }
+    if (AlarmA_active == ALARM_INACTIVE && AlarmB_active == ALARM_INACTIVE /*&& HAL_GPIO_ReadPin(BUTTON1_GPIO_Port, BUTTON1_Pin) == GPIO_PIN_SET*/)
+      {
+      HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, RESET);
+      //printf ("-> Going to standby mode\n\r");
+
+	/* Disable all used wakeup sources: PWR_WAKEUP_PIN2 */
+	  HAL_PWR_DisableWakeUpPin(PWR_WAKEUP_PIN1);
+
+	  /* Clear all related wakeup and alar, flags*/
+	  __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
+	  __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
+
+      /* Enable WakeUp Pin */
+	  HAL_PWR_EnableWakeUpPin(PWR_WAKEUP_PIN1);
+      __HAL_RTC_ALARM_EXTI_ENABLE_IT();  // Włącz przerwanie EXTI dla alarmu
+      __HAL_RTC_ALARM_EXTI_ENABLE_RISING_EDGE();  // Włącz wybudzanie na narastającym zboczu
+
+	  /* Enter the Standby mode */
+	  //HAL_Delay(100);
+	  HAL_PWR_EnterSTANDBYMode();
+      }
 
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-      	time_now_s = (HAL_GetTick() - time_start_ms) / 1000;
-      	    time_string[0] = time_now_s / 60 / 10 + '0';
-      	    time_string[1] = time_now_s / 60 % 10 + '0';
-      	    time_string[3] = time_now_s % 60 / 10 + '0';
-      	    time_string[4] = time_now_s % 60 % 10 + '0';
-
-      	    Paint_SetWidth(&paint, 32);
-      	    Paint_SetHeight(&paint, 96);
-      	    Paint_SetRotate(&paint, ROTATE_90);
-
-      	    Paint_Clear(&paint, UNCOLORED);
-      	    Paint_DrawStringAt(&paint, 0, 4, time_string, &Font24, COLORED);
-      	    EPD_SetFrameMemory(&epd, frame_buffer, 80, 72, Paint_GetWidth(&paint), Paint_GetHeight(&paint));
-      	    EPD_DisplayFrame(&epd);
-
-      	    EPD_DelayMs(&epd, 500);
 
   }
 
@@ -453,15 +452,15 @@ void CDC_ReceiveCallback (uint8_t *Buffer, uint8_t Length)
     }
 }
 
-//void HAL_RTC_AlarmAEventCallback(RTC_HandleTypeDef *hrtc)
-//{
-//  AlarmA_active = ALARM_ACTIVE;
-//}
-//
-//void HAL_RTC_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
-//{
-//  AlarmB_active = ALARM_ACTIVE;
-//}
+void HAL_RTC_AlarmAEventCallback (RTC_HandleTypeDef *hrtc)
+{
+  AlarmA_active = ALARM_ACTIVE;
+}
+
+void HAL_RTC_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
+{
+  AlarmB_active = ALARM_ACTIVE;
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

@@ -28,7 +28,7 @@
 
 
 void Paint_Init(Paint* paint, unsigned char* image, int width, int height) {
-    paint->rotate = ROTATE_0;
+    paint->rotate = ROTATE_90;
     paint->image = image;
     /* 1 byte = 8 pixels, so the width should be the multiple of 8 */
     paint->width = width % 8 ? width + 8 - (width % 8) : width;
