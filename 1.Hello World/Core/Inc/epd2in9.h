@@ -91,10 +91,6 @@ void EPD_DelayMs(EPD* epd, unsigned int delay_time);
 void EPD_DigitalWrite(EPD* epd, int pin, int value);
 int  EPD_DigitalRead(EPD* epd, int pin);
 
-/* private functions */
-static void EPD_SetLut(EPD* epd, const unsigned char* lut);
-static void EPD_SetMemoryArea(EPD* epd, int x_start, int y_start, int x_end, int y_end);
-static void EPD_SetMemoryPointer(EPD* epd, int x, int y);
 
 #endif /* EPD2IN9_H */
 

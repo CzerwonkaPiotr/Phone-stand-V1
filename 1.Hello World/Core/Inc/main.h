@@ -70,6 +70,8 @@ void Error_Handler(void);
 #define SPI_RST_GPIO_Port GPIOA
 #define SPI_BUSY_Pin GPIO_PIN_4
 #define SPI_BUSY_GPIO_Port GPIOA
+#define BUTTON2_Pin GPIO_PIN_0
+#define BUTTON2_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

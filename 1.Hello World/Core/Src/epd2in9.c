@@ -28,6 +28,11 @@
 #include <epdif.h>
 #include <stdlib.h>
 
+/* private functions */
+static void EPD_SetLut (EPD *epd, const unsigned char *lut);
+static void EPD_SetMemoryArea (EPD *epd, int x_start, int y_start, int x_end, int y_end);
+static void EPD_SetMemoryPointer (EPD *epd, int x, int y);
+
 int EPD_Init(EPD* epd, const unsigned char* lut) {
   epd->reset_pin = RST_PIN;
   epd->dc_pin = DC_PIN;
