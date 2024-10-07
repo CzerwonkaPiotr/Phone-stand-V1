@@ -27,7 +27,7 @@ void SetGPSAlarmADataOk(void)
    */
   sAlarm.AlarmTime.Hours = 4;
   sAlarm.AlarmTime.Minutes = 0;
-  sAlarm.AlarmTime.Seconds = 0;
+  sAlarm.AlarmTime.Seconds = 30;
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
   sAlarm.AlarmMask = RTC_ALARMMASK_DATEWEEKDAY;
@@ -54,6 +54,7 @@ void SetGPSAlarmADataNOk(void)
   HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
   HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 
+
   sAlarm.AlarmTime.Seconds = sTime.Seconds;
   sAlarm.AlarmTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
   sAlarm.AlarmTime.StoreOperation = RTC_STOREOPERATION_RESET;
@@ -64,6 +65,7 @@ void SetGPSAlarmADataNOk(void)
     {
       Error_Handler ();
     }
+
 #ifdef USB_CDC_IS_ACTIVE
   printf ("-> ALARM_A SET (data NOK)\n\r");
   printf ("Current time: %d:%d:%d\n\r",sTime.Hours, sTime.Minutes, sTime.Seconds);
@@ -92,6 +94,7 @@ void SetGPSAlarmB(void)
     {
       Error_Handler ();
     }
+
 #ifdef USB_CDC_IS_ACTIVE
   printf ("-> ALARM_B SET \n\r");
   printf ("Current time: %d:%d:%d\n\r",sTime.Hours, sTime.Minutes, sTime.Seconds);

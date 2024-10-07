@@ -182,7 +182,6 @@ uint8_t GpsRunSequence (void)
   if (GPSDataState == NO_DATA_NEEDED)
   {
     HAL_UART_Receive_IT (gps_huart, (uint8_t*) &rx_data, 1); // setting UART IT capture again
-    GPS_SendCommands ();
     GPSDataState = WAITING_FOR_DATA;
 #ifdef USB_CDC_IS_ACTIVE
       printf ("-> No GPS data was needed but now it is, turn on IT on UART\n\r");
@@ -198,7 +197,6 @@ uint8_t GpsRunSequence (void)
     if (notReceivedDataCount > 19)
     {
       GPS_Sleep ();
-      HAL_Delay (200);
       GPS_Wakeup ();
       GPS_SendCommands ();
       notReceivedDataCount = 0;

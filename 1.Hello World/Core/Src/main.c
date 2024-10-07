@@ -78,9 +78,9 @@ uint8_t ReceivedData[64]; // A buffer for parsing
 BMP280_t Bmp280;
 float Temperature, Pressure, Humidity;
 
-volatile uint8_t process_AlarmA = INACTIVE;
-volatile uint8_t process_AlarmB = INACTIVE;
-volatile uint8_t process_UserMenu = INACTIVE;
+volatile uint8_t process_AlarmA;
+volatile uint8_t process_AlarmB;
+volatile uint8_t process_UserMenu;
 
 TButton userButton;
 
@@ -92,7 +92,7 @@ uint32_t process_UserMenuTimer = 0;
 void SystemClock_Config(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
-
+void longpressB2 (void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -119,7 +119,6 @@ int main(void)
   /* USER CODE BEGIN Init */
   /* USER CODE END Init */
 
-
   /* Configure the system clock */
   SystemClock_Config();
 
@@ -144,27 +143,31 @@ int main(void)
 
   GPS_Init (&huart1);
 
-  ButtonInitKey(&userButton, BUTTON1_GPIO_Port, BUTTON1_Pin, 20, 1000, 500);
-  //ButtonRegisterPressCallback(&userButton, simulateAlarmB); // Register callback for button pressed action
-  //ButtonRegisterLongPressCallback(&userButton, simulateAlarmA); // Register callback for button long press action
+  ButtonInitKey (&userButton, BUTTON2_GPIO_Port, BUTTON2_Pin, 20, 1000, 500);
+  //ButtonRegisterPressCallback(&userButton, longpressB2); // Register callback for button pressed action
+  ButtonRegisterLongPressCallback (&userButton, longpressB2); // Register callback for button long press action
 
   wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
   if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) == SET && __HAL_PWR_GET_FLAG(PWR_FLAG_WU) == SET) // Check and handle if the system was resumed from StandBy mode
   {
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);  	// Clear Standby flag
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU); 		// Clear Wkup flag
+    __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
+    __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRBF);
+    __HAL_GPIO_EXTI_CLEAR_IT(EXTI_LINE_0);
   }
-  /* Disable all used wakeup sources: PWR_WAKEUP_PIN1 */
-  HAL_PWR_DisableWakeUpPin (PWR_WAKEUP_PIN1);
   switch (wakeUpSource)
   {
     case WKUP_SRC_ALARM_A_DATA_NOK:
       process_AlarmA = ACTIVE;
+      process_AlarmB = INACTIVE;
       break;
     case WKUP_SRC_ALARM_A_DATA_OK:
       process_AlarmA = ACTIVE;
+      process_AlarmB = INACTIVE;
       break;
     case WKUP_SRC_ALARM_B:
+      process_AlarmA = INACTIVE;
       process_AlarmB = ACTIVE;
       break;
     case WKUP_SRC_ALARM_A_OR_B:
@@ -177,6 +180,27 @@ int main(void)
       break;
     case WKUP_SRC_WKUP_PIN:
       process_UserMenu = ACTIVE;
+      process_UserMenuTimer = HAL_GetTick ();
+      if (RTC->CR & RTC_CR_ALRAE)
+      {
+	RTC_AlarmTypeDef sAlarm =
+	{ 0 };
+	HAL_RTC_GetAlarm (&hrtc, &sAlarm, RTC_ALARM_A, RTC_FORMAT_BIN);
+	if (HAL_RTC_SetAlarm_IT (&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
+	{
+	  Error_Handler ();
+	}
+      }
+      if (RTC->CR & RTC_CR_ALRBE)
+      {
+	RTC_AlarmTypeDef sAlarm =
+	{ 0 };
+	HAL_RTC_GetAlarm (&hrtc, &sAlarm, RTC_ALARM_B, RTC_FORMAT_BIN);
+	if (HAL_RTC_SetAlarm_IT (&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
+	{
+	  Error_Handler ();
+	}
+      }
       break;
   };
 
@@ -225,7 +249,7 @@ int main(void)
 
     EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
     EPD_DisplayFrame (&epd);
-    EPD_DelayMs (&epd, 3000);
+    EPD_DelayMs (&epd, 300);
   }
   /* USER CODE END 2 */
 
@@ -233,7 +257,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
     {
-      ButtonTask(&userButton); // Machine state task for button
+    ButtonTask (&userButton); // Machine state task for button
     HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
     if (((HAL_GetTick () - process_UserMenuTimer) > 10000) && process_UserMenu == ACTIVE)
@@ -256,6 +280,7 @@ int main(void)
 
     if (process_AlarmB == ACTIVE)
     {
+
       BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
       //HAL_Delay (50); // TODO no delays allowed
       BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
@@ -301,21 +326,11 @@ int main(void)
 
     if (process_AlarmA == INACTIVE && process_AlarmB == INACTIVE && process_UserMenu == INACTIVE)
     {
-      HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, RESET);
 #ifdef USB_CDC_IS_ACTIVE
       //printf ("-> Going to standby mode\n\r");
 #endif
-      /* Disable all used wakeup sources: PWR_WAKEUP_PIN2 */
-      HAL_PWR_DisableWakeUpPin (PWR_WAKEUP_PIN1);
-
-      /* Clear all related wakeup and alar, flags*/
-      __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU);
-      __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
-
       /* Enable WakeUp Pin */
       HAL_PWR_EnableWakeUpPin (PWR_WAKEUP_PIN1);
-      __HAL_RTC_ALARM_EXTI_ENABLE_IT();  // Włącz przerwanie EXTI dla alarmu
-      __HAL_RTC_ALARM_EXTI_ENABLE_RISING_EDGE();  // Włącz wybudzanie na narastającym zboczu
 
       /* Enter the Standby mode */
       HAL_PWR_EnterSTANDBYMode ();
@@ -350,12 +365,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 25;
-  RCC_OscInitStruct.PLL.PLLN = 336;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV4;
-  RCC_OscInitStruct.PLL.PLLQ = 7;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -365,12 +375,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSE;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
   {
     Error_Handler();
   }
@@ -382,15 +392,15 @@ void SystemClock_Config(void)
   */
 static void MX_NVIC_Init(void)
 {
+  /* RTC_Alarm_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
   /* EXTI0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
   /* USART1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
-  /* RTC_Alarm_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
@@ -431,7 +441,7 @@ void HAL_RTC_AlarmAEventCallback (RTC_HandleTypeDef *hrtc)
   process_AlarmA = ACTIVE;
 }
 
-void HAL_RTC_AlarmBEventCallback(RTC_HandleTypeDef *hrtc)
+void HAL_RTCEx_AlarmBEventCallback (RTC_HandleTypeDef *hrtc)
 {
   process_AlarmB = ACTIVE;
 }
@@ -448,7 +458,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   __HAL_GPIO_EXTI_CLEAR_IT(EXTI_LINE_0);
 }
 
-
+void longpressB2 (void)
+{
+  //process_AlarmB = ACTIVE;
+}
 /* USER CODE END 4 */
 
 /**
