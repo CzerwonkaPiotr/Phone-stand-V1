@@ -57,15 +57,17 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-  HAL_PWR_EnableBkUpAccess();
+  HAL_PWR_EnableBkUpAccess ();
   __HAL_RCC_RTC_ENABLE();
 
   // Check if RTC was already initialized
-  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR0) == 0x5A5AA5A5)
+  if (HAL_RTCEx_BKUPRead (&hrtc, RTC_BKP_DR0) == 0x5A5AA5A5)
   {
-      return;
+    HAL_PWR_DisableBkUpAccess ();
+    return;
   }
-  HAL_RTCEx_BKUPWrite(&hrtc, RTC_BKP_DR0, 0x5A5AA5A5);
+  HAL_RTCEx_BKUPWrite (&hrtc, RTC_BKP_DR0, 0x5A5AA5A5);
+  HAL_PWR_DisableBkUpAccess ();
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date

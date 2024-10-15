@@ -177,7 +177,7 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 //// Main GPS sequence
 //
 
-uint8_t GpsRunSequence (void)
+uint8_t GPS_RunProcess (void)
 {
   if (GPSDataState == NO_DATA_NEEDED)
   {
@@ -216,13 +216,13 @@ uint8_t GpsRunSequence (void)
     {
       LT_SetTime (&hrtc, &currentDateTime);
       SetGPSAlarmADataOk ();
+#ifdef USB_CDC_IS_ACTIVE
       RTC_TimeTypeDef sTime =
       { 0 };
       HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
       RTC_DateTypeDef sDate =
       { 0 };
       HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
-#ifdef USB_CDC_IS_ACTIVE
 	  printf ("-> Date updated: %02d-%02d-%04d Time: %02d:%02d:%02d\n\r",
 		  sDate.Date, sDate.Month, sDate.Year + 2000, sTime.Hours,
 		  sTime.Minutes, sTime.Seconds);

@@ -21,14 +21,14 @@ typedef struct {
 typedef enum {
   NO_DATA_NEEDED = 0,
   WAITING_FOR_DATA = 1,
-  DATA_RECEIVED = 2,
+  DATA_RECEIVED = 2
 }GPSGetDataState;
 
 void GPS_SendCommands (void);
 void GPS_Init(UART_HandleTypeDef *huart);
 void GPS_Sleep(void);
 void GPS_Wakeup(void);
-uint8_t GpsRunSequence (void);
+uint8_t GPS_RunProcess (void);
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart);
 
 #endif /* INC_NEO_6M_H_ */

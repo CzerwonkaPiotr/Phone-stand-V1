@@ -115,5 +115,6 @@ void BMP280_SetHumidityOversampling(BMP280_t *bmp, uint8_t  HOversampling);
 
 float BMP280_ReadTemperature(BMP280_t *bmp);
 uint8_t BMP280_ReadSensorData(BMP280_t *bmp, float *Pressure, float *Temperature, float *Humidity);
+uint8_t BMP280_ReadSensorForcedMode (BMP280_t *bmp, float *Pressure, float *Temperature, float *Humidity);
 
 #endif /* INC_BMP280_H_ */

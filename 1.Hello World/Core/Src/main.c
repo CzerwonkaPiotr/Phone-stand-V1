@@ -33,11 +33,7 @@
 #include "NEO_6M.h"
 
 #include "alarms_rtc.h"
-#include "button.h"
-#include "epd2in9.h"
-#include "epdif.h"
-#include "epdpaint.h"
-#include "imagedata.h"
+#include "ui.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -75,14 +71,15 @@ uint8_t ReceviedLines; // Complete lines counter
 uint8_t ReceivedData[64]; // A buffer for parsing
 #endif
 
-BMP280_t Bmp280;
-float Temperature, Pressure, Humidity;
+UI_Data ui;
 
 volatile uint8_t process_AlarmA;
 volatile uint8_t process_AlarmB;
 volatile uint8_t process_UserMenu;
-
-TButton userButton;
+volatile uint8_t UserMenuFirstUse = 0;
+// 0 - button wasn't pressed
+// 1 - button was pressed and initial screen change has to be done
+// 2 - the initial screen change was done in current userMenu process
 
 wakeUpSource_t wakeUpSource = 0;
 uint32_t process_UserMenuTimer = 0;
@@ -92,7 +89,6 @@ uint32_t process_UserMenuTimer = 0;
 void SystemClock_Config(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
-void longpressB2 (void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -143,10 +139,6 @@ int main(void)
 
   GPS_Init (&huart1);
 
-  ButtonInitKey (&userButton, BUTTON2_GPIO_Port, BUTTON2_Pin, 20, 1000, 500);
-  //ButtonRegisterPressCallback(&userButton, longpressB2); // Register callback for button pressed action
-  ButtonRegisterLongPressCallback (&userButton, longpressB2); // Register callback for button long press action
-
   wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
   if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) == SET && __HAL_PWR_GET_FLAG(PWR_FLAG_WU) == SET) // Check and handle if the system was resumed from StandBy mode
   {
@@ -180,6 +172,7 @@ int main(void)
       break;
     case WKUP_SRC_WKUP_PIN:
       process_UserMenu = ACTIVE;
+      UserMenuFirstUse = 1;
       process_UserMenuTimer = HAL_GetTick ();
       if (RTC->CR & RTC_CR_ALRAE)
       {
@@ -238,15 +231,6 @@ int main(void)
 	break;
     };
     /* Display the frame_buffer */
-
-    /* Draw something to the frame buffer */
-    Paint_DrawRectangle (&paint, 16, 60, 56, 110, COLORED);
-    Paint_DrawLine (&paint, 16, 60, 56, 110, COLORED);
-    Paint_DrawLine (&paint, 56, 60, 16, 110, COLORED);
-    Paint_DrawCircle (&paint, 120, 90, 30, COLORED);
-    Paint_DrawFilledRectangle (&paint, 16, 130, 56, 180, COLORED);
-    Paint_DrawFilledCircle (&paint, 120, 160, 30, COLORED);
-
     EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
     EPD_DisplayFrame (&epd);
     EPD_DelayMs (&epd, 300);
@@ -257,11 +241,17 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
     {
-    ButtonTask (&userButton); // Machine state task for button
     HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
-    if (((HAL_GetTick () - process_UserMenuTimer) > 10000) && process_UserMenu == ACTIVE)
+    if (((HAL_GetTick () - process_UserMenuTimer) < 10000) && process_UserMenu == ACTIVE)
     {
+      UI_RunMenuProcess (UserMenuFirstUse);
+      UserMenuFirstUse = 2;
+    }
+    else
+    {
+      UI_ShowClockScreen ();
+      UserMenuFirstUse = 0;
       process_UserMenu = INACTIVE;
     }
 
@@ -271,7 +261,7 @@ int main(void)
 
     if (process_AlarmA == ACTIVE)
     {
-      process_AlarmA = GpsRunSequence ();
+      process_AlarmA = GPS_RunProcess ();
     }
 
     //
@@ -323,6 +313,9 @@ int main(void)
       			Parser_Parse(ReceivedData);
       	  }
 #endif
+
+    // TODO uruchom proces ledów
+
 
     if (process_AlarmA == INACTIVE && process_AlarmB == INACTIVE && process_UserMenu == INACTIVE)
     {
@@ -448,20 +441,17 @@ void HAL_RTCEx_AlarmBEventCallback (RTC_HandleTypeDef *hrtc)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == BUTTON1_Pin) // Check if it's our button
+  if (GPIO_Pin == BUTTON1_Pin)
   {
     // Interrupt wakes up MCU
     process_UserMenu = ACTIVE;
+    if (UserMenuFirstUse == 0) UserMenuFirstUse = 1;
     process_UserMenuTimer = HAL_GetTick ();
   }
   // Clear the EXTI Line 0 flag (for WKUP pin)
   __HAL_GPIO_EXTI_CLEAR_IT(EXTI_LINE_0);
 }
 
-void longpressB2 (void)
-{
-  //process_AlarmB = ACTIVE;
-}
 /* USER CODE END 4 */
 
 /**

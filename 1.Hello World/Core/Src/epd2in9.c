@@ -61,6 +61,8 @@ int EPD_Init(EPD* epd, const unsigned char* lut) {
   EPD_SendData(epd, 0x1A);                     // 4 dummy lines per gate
   EPD_SendCommand(epd, SET_GATE_TIME);
   EPD_SendData(epd, 0x08);                     // 2us per line
+  EPD_SendCommand (epd, BORDER_WAVEFORM_CONTROL);
+  EPD_SendData (epd, 0x00);
   EPD_SendCommand(epd, DATA_ENTRY_MODE_SETTING);
   EPD_SendData(epd, 0x03);                     // X increment; Y increment
   EPD_SetLut(epd, epd->lut);
