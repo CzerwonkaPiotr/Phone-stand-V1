@@ -31,7 +31,6 @@
 #include "stdlib.h"
 #include "bmp280.h"
 #include "NEO_6M.h"
-
 #include "alarms_rtc.h"
 #include "ui.h"
 /* USER CODE END Includes */
@@ -49,8 +48,6 @@
 
 //#define USB_CDC_IS_ACTIVE // Turn on and off printf functionality
 
-#define COLORED      0
-#define UNCOLORED    1
 
 /* USER CODE END PD */
 
@@ -71,7 +68,6 @@ uint8_t ReceviedLines; // Complete lines counter
 uint8_t ReceivedData[64]; // A buffer for parsing
 #endif
 
-UI_Data ui;
 
 volatile uint8_t process_AlarmA;
 volatile uint8_t process_AlarmB;
@@ -103,7 +99,6 @@ static void MX_NVIC_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  unsigned char* frame_buffer = (unsigned char*)malloc(EPD_WIDTH * EPD_HEIGHT / 8);
 
   /* USER CODE END 1 */
 
@@ -132,12 +127,9 @@ int main(void)
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-  if (BMP280_Init (&Bmp280, &hi2c1, BMP280_ADDRESS))
-  {
-    //TODO error
-  }
 
   GPS_Init (&huart1);
+  UI_Init ();
 
   wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
   if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) == SET && __HAL_PWR_GET_FLAG(PWR_FLAG_WU) == SET) // Check and handle if the system was resumed from StandBy mode
@@ -197,50 +189,12 @@ int main(void)
       break;
   };
 
-  EPD epd;
-  if (EPD_Init(&epd, lut_full_update) != 0)
-    {
-    //TODO error
-      return -1;
-    }
-
-    Paint paint;
-    Paint_Init(&paint, frame_buffer, epd.width, epd.height);
-    Paint_Clear(&paint, UNCOLORED);
-  if (HAL_GPIO_ReadPin (BUTTON2_GPIO_Port, BUTTON2_Pin) == GPIO_PIN_RESET)
-  {
-    switch (wakeUpSource)
-    {
-      case WKUP_SRC_ALARM_A_DATA_NOK:
-	Paint_DrawStringAt (&paint, 0, 14, "RTC alarmA data NOK", &Font16, COLORED);
-	break;
-      case WKUP_SRC_ALARM_A_DATA_OK:
-	Paint_DrawStringAt (&paint, 0, 14, "RTC alarmA", &Font16, COLORED);
-	break;
-      case WKUP_SRC_ALARM_B:
-	Paint_DrawStringAt (&paint, 0, 14, "RTC alarmB", &Font16, COLORED);
-	break;
-      case WKUP_SRC_ALARM_A_OR_B:
-	Paint_DrawStringAt (&paint, 0, 14, "RTC alarmA or B", &Font16, COLORED);
-	break;
-      case WKUP_SRC_BOOT_UP:
-	Paint_DrawStringAt (&paint, 0, 14, "BOOT UP", &Font16, COLORED);
-	break;
-      case WKUP_SRC_WKUP_PIN:
-	Paint_DrawStringAt (&paint, 0, 14, "WKUP PIN", &Font16, COLORED);
-	break;
-    };
-    /* Display the frame_buffer */
-    EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-    EPD_DisplayFrame (&epd);
-    EPD_DelayMs (&epd, 300);
-  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
-    {
+  {
     HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
 
     if (((HAL_GetTick () - process_UserMenuTimer) < 10000) && process_UserMenu == ACTIVE)
@@ -248,16 +202,16 @@ int main(void)
       UI_RunMenuProcess (UserMenuFirstUse);
       UserMenuFirstUse = 2;
     }
-    else
+    else if (((HAL_GetTick () - process_UserMenuTimer) > 10000) && process_UserMenu == ACTIVE)
     {
       UI_ShowClockScreen ();
       UserMenuFirstUse = 0;
       process_UserMenu = INACTIVE;
     }
 
-      //
-      //// Alarm A sequence
-      //
+    //
+    //// Alarm A sequence
+    //
 
     if (process_AlarmA == ACTIVE)
     {
@@ -271,33 +225,30 @@ int main(void)
     if (process_AlarmB == ACTIVE)
     {
 
-      BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
-      //HAL_Delay (50); // TODO no delays allowed
-      BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
-      char atmData[128];
-      Paint_Clear (&paint, UNCOLORED);
-      sprintf (atmData, "-> Temperature = %.1f Pressure = %.1f Humidity = %.1f", Temperature, Pressure, Humidity);
+//      BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
+//      //HAL_Delay (50); // TODO no delays allowed
+//      BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
+//      char atmData[128];
+//      Paint_Clear (&paint, UNCOLORED);
+//      sprintf (atmData, "-> Temperature = %.1f Pressure = %.1f Humidity = %.1f", Temperature, Pressure, Humidity);
+//
+//      Paint_DrawStringAt (&paint, 0, 14, atmData, &Font8, COLORED);
+//      RTC_TimeTypeDef sTime =
+//      { 0 };
+//      HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+//      RTC_DateTypeDef sDate =
+//      { 0 };
+//      HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
+//      sprintf (atmData, "Current date and time: %02d-%02d-%04d", sDate.Date, sDate.Month, sDate.Year + 2000);
+//      Paint_DrawStringAt (&paint, 0, 44, atmData, &Font12, COLORED);
+//      sprintf (atmData, "Time: %02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
+//      Paint_DrawStringAt (&paint, 0, 74, atmData, &Font12, COLORED);
+//      EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
+//      EPD_DisplayFrame (&epd);
+//      EPD_Sleep (&epd);
 
-      Paint_DrawStringAt (&paint, 0, 14, atmData, &Font8, COLORED);
-      RTC_TimeTypeDef sTime =
-      { 0 };
-      HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-      RTC_DateTypeDef sDate =
-      { 0 };
-      HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
-      sprintf (atmData, "Current date and time: %02d-%02d-%04d", sDate.Date, sDate.Month, sDate.Year + 2000);
-      Paint_DrawStringAt (&paint, 0, 44, atmData, &Font12, COLORED);
-      sprintf (atmData, "Time: %02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
-      Paint_DrawStringAt (&paint, 0, 74, atmData, &Font12, COLORED);
-      EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-      EPD_DisplayFrame (&epd);
-      EPD_Sleep (&epd);
-      process_AlarmB = INACTIVE;
-
-      SetGPSAlarmB ();
+      process_AlarmB = UI_RunOneMinuteProcess ();
     }
-
-
 
 #ifdef USB_CDC_IS_ACTIVE
       // Check if there is something to parse - any complete line
@@ -315,7 +266,6 @@ int main(void)
 #endif
 
     // TODO uruchom proces ledów
-
 
     if (process_AlarmA == INACTIVE && process_AlarmB == INACTIVE && process_UserMenu == INACTIVE)
     {

@@ -15,6 +15,9 @@
 #define SCREEN_WIDTH       128
 #define SCREEN_HEIGHT      296
 
+#define COLORED      0
+#define UNCOLORED    1
+
 uint8_t UI_RunOneMinuteProcess (void);
 void UI_RunMenuProcess (uint8_t UserMenuFirstUse);
 void UI_NextScreenCallback (void);

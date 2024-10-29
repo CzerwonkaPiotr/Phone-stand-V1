@@ -141,19 +141,29 @@ void Paint_DrawPixel(Paint* paint, int x, int y, int colored) {
  */
 void Paint_DrawCharAt(Paint* paint, int x, int y, char ascii_char, sFONT* font, int colored) {
     int i, j;
-    unsigned int char_offset = (ascii_char - ' ') * font->Height * (font->Width / 8 + (font->Width % 8 ? 1 : 0));
+  unsigned int char_offset;
+  if (font == &Font64)  // This font starts from 0 not from SPACE
+  {
+    char_offset = (ascii_char - '0') * font->Height * (font->Width / 8 + (font->Width % 8 ? 1 : 0));
+  }
+  else
+  {
+    char_offset = (ascii_char - ' ') * font->Height * (font->Width / 8 + (font->Width % 8 ? 1 : 0));
+  }
     const unsigned char* ptr = &font->table[char_offset];
 
     for (j = 0; j < font->Height; j++) {
         for (i = 0; i < font->Width; i++) {
             if (*ptr & (0x80 >> (i % 8))) {
+
                 Paint_DrawPixel(paint, x + i, y + j, colored);
             }
             if (i % 8 == 7) {
                 ptr++;
             }
         }
-        if (font->Width % 8 != 0) {
+    if (font->Width % 8 != 0)
+    {
             ptr++;
         }
     }
@@ -166,7 +176,7 @@ void Paint_DrawStringAt(Paint* paint, int x, int y, const char* text, sFONT* fon
     const char* p_text = text;
     unsigned int counter = 0;
     int refcolumn = x;
-    
+
     /* Send the string character by character on EPD */
     while (*p_text != 0) {
         /* Display one character on EPD */

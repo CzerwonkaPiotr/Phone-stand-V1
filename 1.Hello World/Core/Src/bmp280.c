@@ -257,18 +257,19 @@ uint8_t BMP280_ReadSensorForcedMode (BMP280_t *bmp, float *Pressure, float *Temp
 
   if (readSeq == 0)
   {
-    BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
+    BMP280_SetMode (bmp, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
     forcedModeTimer = HAL_GetTick ();
     readSeq = 1;
     return 0;
   }
   else if (((HAL_GetTick () - forcedModeTimer) > 50) && readSeq == 1)
   {
-    BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
+    BMP280_ReadSensorData (bmp, Pressure, Temperature, Humidity);
     readSeq = 0;
     return 1;
   }
   Error_Handler (); // Shouldn't reach this line
+  return -1;
 }
 
 //

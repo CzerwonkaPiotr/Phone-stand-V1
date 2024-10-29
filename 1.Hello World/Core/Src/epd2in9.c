@@ -115,7 +115,7 @@ void EPD_SendData(EPD* epd, unsigned char data) {
  */
 void EPD_WaitUntilIdle(EPD* epd) {
   while(EPD_DigitalRead(epd, epd->busy_pin) == HIGH) {      //0: busy, 1: idle
-    EPD_DelayMs(epd, 100);
+    EPD_DelayMs (epd, 10);
   }      
 }
 

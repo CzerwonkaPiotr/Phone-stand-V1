@@ -1,3 +1,4 @@
+
 /**
   ******************************************************************************
   * @file    fonts.h
@@ -39,9 +40,9 @@
 #ifndef __FONTS_H
 #define __FONTS_H
 
-/* Max size of bitmap will based on a font24 (17x24) */
-#define MAX_HEIGHT_FONT         24
-#define MAX_WIDTH_FONT          17
+/* Max size of bitmap will based on this data */
+#define MAX_HEIGHT_FONT         68
+#define MAX_WIDTH_FONT          50
 #define OFFSET_BITMAP           54
 
 #ifdef __cplusplus
@@ -59,11 +60,15 @@ typedef struct _tFont
   
 } sFONT;
 
+// IMPORTANT: CUSTOM FONTS SIZE HAVE TO BE A MULTIPLICATION OF 8 IF GENERATED WITH truetype2gfx GENERATOR
+
+extern sFONT Font64;
 extern sFONT Font24;
 extern sFONT Font20;
 extern sFONT Font16;
 extern sFONT Font12;
 extern sFONT Font8;
+
 
 #ifdef __cplusplus
 }

@@ -1,0 +1,8 @@
+To create fonts create them here:
+The fonts may have to be prepared so the size is correct, FontCreator 15.0 was used. 
+
+https://rop.nl/truetype2gfx/ 
+big ones have to be edited by hand
+
+And later edit them here:
+https://tchapi.github.io/Adafruit-GFX-Font-Customiser/
