@@ -268,8 +268,12 @@ uint8_t BMP280_ReadSensorForcedMode (BMP280_t *bmp, float *Pressure, float *Temp
     readSeq = 0;
     return 1;
   }
-  Error_Handler (); // Shouldn't reach this line
-  return -1;
+  else
+  {
+    Error_Handler (); // Shouldn't reach this line
+    return -1;
+  }
+
 }
 
 //

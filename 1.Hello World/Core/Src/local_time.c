@@ -113,6 +113,8 @@ void LT_SetTime (RTC_HandleTypeDef *hrtc, DateTime *time)
   sTime.Hours = (uint8_t)time->hour;
   sTime.Minutes = (uint8_t)time->minute;
   sTime.Seconds = (uint8_t)time->second;
-  HAL_RTC_SetDate(hrtc, &sDate, RTC_FORMAT_BIN);
-  HAL_RTC_SetTime(hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_PWR_EnableBkUpAccess ();
+  HAL_RTC_SetDate (hrtc, &sDate, RTC_FORMAT_BIN);
+  HAL_RTC_SetTime (hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_PWR_DisableBkUpAccess ();
 }

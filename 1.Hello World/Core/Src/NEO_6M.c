@@ -194,12 +194,21 @@ uint8_t GPS_RunProcess (void)
 #ifdef USB_CDC_IS_ACTIVE
       printf ("-> Waiting for data from GPS, notReceivedDataCount = %d\n\r", notReceivedDataCount);
 #endif
-    if (notReceivedDataCount > 19)
+    if (notReceivedDataCount > 9)
     {
       GPS_Sleep ();
+      HAL_Delay (1000);
       GPS_Wakeup ();
+      HAL_Delay (1000);
       GPS_SendCommands ();
       notReceivedDataCount = 0;
+#ifdef USB_CDC_IS_ACTIVE
+	  printf ("-> GPS DATA NOT RECEIVED FOR 10S\n\r");
+#endif
+      SetGPSAlarmADataNOk ();
+      GPSDataState = NO_DATA_NEEDED;
+      return 0;
+
     }
     else notReceivedDataCount++;
   }

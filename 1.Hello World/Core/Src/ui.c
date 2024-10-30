@@ -69,13 +69,14 @@ void UI_Init (void)
   ButtonRegisterPressCallback (&userButton, UI_NextScreenCallback);
   ButtonRegisterLongPressCallback (&userButton, UI_EnterSettingsCallback);
 
-  HAL_PWR_EnableBkUpAccess ();
-  uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
-  chartTypeSetPosition = (uint8_t) ((regTemp >> CHART_TYPE_REG_OFFSET) & 0xFF);
-  chartRangeSetPosition = (uint8_t) ((regTemp >> CHART_RANGE_REG_OFFSET) & 0xFF);
-  ledSequenceSetPosition = (uint8_t) ((regTemp >> LED_SEQUENCE_REG_OFFSET) & 0xFF);
-  ledDurationSetPosition = (uint8_t) ((regTemp >> LED_DURATION_REG_OFFSET) & 0xFF);
-  HAL_PWR_DisableBkUpAccess ();
+  //settings backup
+//  HAL_PWR_EnableBkUpAccess ();//
+//  uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//  chartTypeSetPosition = (uint8_t) ((regTemp >> CHART_TYPE_REG_OFFSET) & 0xFF);
+//  chartRangeSetPosition = (uint8_t) ((regTemp >> CHART_RANGE_REG_OFFSET) & 0xFF);
+//  ledSequenceSetPosition = (uint8_t) ((regTemp >> LED_SEQUENCE_REG_OFFSET) & 0xFF);
+//  ledDurationSetPosition = (uint8_t) ((regTemp >> LED_DURATION_REG_OFFSET) & 0xFF);
+//  HAL_PWR_DisableBkUpAccess ();
 
   if (EPD_Init (&epd, lut_full_update) != 0)
   {
@@ -103,8 +104,8 @@ void UI_FullUpdateCurrentScreen (void)
     Paint_DrawStringAt (&paint, 8, 5, temp, &Font64, COLORED);
     sprintf (temp, "%02d", sTime.Minutes);
     Paint_DrawStringAt (&paint, 142, 5, temp, &Font64, COLORED);
-    Paint_DrawFilledCircle (&paint, 131, 22, 6, COLORED); // Colon
-    Paint_DrawFilledCircle (&paint, 131, 68, 6, COLORED); // Colon
+    Paint_DrawFilledCircle (&paint, 131, 22, 5, COLORED); // Colon
+    Paint_DrawFilledCircle (&paint, 131, 68, 5, COLORED); // Colon
     EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
     EPD_DisplayFrame (&epd);
     EPD_Sleep (&epd);
@@ -118,10 +119,11 @@ void UI_FullUpdateCurrentScreen (void)
 
   }
 
-  if (BMP280_ReadSensorForcedMode (&Bmp280, &Pressure, &Temperature, &Humidity) == 0)
-  {
-    return;
-  }
+//  if (BMP280_ReadSensorForcedMode (&Bmp280, &Pressure, &Temperature, &Humidity) == 0)
+//  {
+  //TODO this function has to be finished
+//    return;
+//  }
 }
 uint8_t UI_RunOneMinuteProcess (void)
 {
@@ -225,11 +227,11 @@ void UI_NextSettingsGroupCallback (void)
   {
     chartTypeSetPosition = chartTypeSelectedPosition;
 
-    HAL_PWR_EnableBkUpAccess ();
-    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
-    regTemp = (regTemp & 0xFFFFFF00) | (chartTypeSetPosition << CHART_TYPE_REG_OFFSET);
-    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
-    HAL_PWR_DisableBkUpAccess ();
+//    HAL_PWR_EnableBkUpAccess ();
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    regTemp = (regTemp & 0xFFFFFF00) | (chartTypeSetPosition << CHART_TYPE_REG_OFFSET);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_PWR_DisableBkUpAccess ();
 
     chartSettingGroup = 2;
     chartRangeSelectedPosition = 1;
@@ -238,11 +240,11 @@ void UI_NextSettingsGroupCallback (void)
   {
     ledSequenceSetPosition = ledSequenceSelectedPosition;
 
-    HAL_PWR_EnableBkUpAccess ();
-    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
-    regTemp = (regTemp & 0xFF00FFFF) | (ledSequenceSetPosition << LED_SEQUENCE_REG_OFFSET);
-    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
-    HAL_PWR_DisableBkUpAccess ();
+//    HAL_PWR_EnableBkUpAccess ();
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    regTemp = (regTemp & 0xFF00FFFF) | (ledSequenceSetPosition << LED_SEQUENCE_REG_OFFSET);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_PWR_DisableBkUpAccess ();
 
     ledSettingGroup = 2;
     ledDurationSelectedPosition = 1;
@@ -260,11 +262,11 @@ void UI_ExitSettingsCallback (void)
   {
     chartRangeSetPosition = chartRangeSelectedPosition;
 
-    HAL_PWR_EnableBkUpAccess ();
-    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
-    regTemp = (regTemp & 0xFFFF00FF) | (chartRangeSetPosition << CHART_RANGE_REG_OFFSET);
-    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
-    HAL_PWR_DisableBkUpAccess ();
+//    HAL_PWR_EnableBkUpAccess ();
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    regTemp = (regTemp & 0xFFFF00FF) | (chartRangeSetPosition << CHART_RANGE_REG_OFFSET);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_PWR_DisableBkUpAccess ();
 
     chartSettingGroup = 0;
   }
@@ -272,11 +274,11 @@ void UI_ExitSettingsCallback (void)
   {
     ledDurationSetPosition = ledDurationSelectedPosition;
 
-    HAL_PWR_EnableBkUpAccess ();
-    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
-    regTemp = (regTemp & 0x00FFFFFF) | (ledDurationSetPosition << LED_DURATION_REG_OFFSET);
-    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
-    HAL_PWR_DisableBkUpAccess ();
+//    HAL_PWR_EnableBkUpAccess ();
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    regTemp = (regTemp & 0x00FFFFFF) | (ledDurationSetPosition << LED_DURATION_REG_OFFSET);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_PWR_DisableBkUpAccess ();
 
     ledSettingGroup = 0;
   }
