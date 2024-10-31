@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "adc.h"
 #include "i2c.h"
 #include "rtc.h"
 #include "spi.h"
@@ -42,7 +43,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define BMP280_ADDRESS 0x76
 #define ACTIVE 1
 #define INACTIVE 0
 
@@ -123,12 +123,12 @@ int main(void)
   MX_USART1_UART_Init();
   MX_RTC_Init();
   MX_SPI1_Init();
+  MX_ADC1_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
-  GPS_Init (&huart1);
   UI_Init ();
 
   wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
@@ -188,15 +188,13 @@ int main(void)
       }
       break;
   };
-
+  HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
-
     if (((HAL_GetTick () - process_UserMenuTimer) < 10000) && process_UserMenu == ACTIVE)
     {
       UI_RunMenuProcess (UserMenuFirstUse);
@@ -222,32 +220,15 @@ int main(void)
     //// Alarm B sequence
     //
 
-    if (process_AlarmB == ACTIVE)
+    if (process_AlarmB == ACTIVE && process_AlarmA == INACTIVE)
     {
 
 //      BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
 //      //HAL_Delay (50); // TODO no delays allowed
 //      BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
-//      char atmData[128];
-//      Paint_Clear (&paint, UNCOLORED);
-//      sprintf (atmData, "-> Temperature = %.1f Pressure = %.1f Humidity = %.1f", Temperature, Pressure, Humidity);
-//
-//      Paint_DrawStringAt (&paint, 0, 14, atmData, &Font8, COLORED);
-//      RTC_TimeTypeDef sTime =
-//      { 0 };
-//      HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-//      RTC_DateTypeDef sDate =
-//      { 0 };
-//      HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
-//      sprintf (atmData, "Current date and time: %02d-%02d-%04d", sDate.Date, sDate.Month, sDate.Year + 2000);
-//      Paint_DrawStringAt (&paint, 0, 44, atmData, &Font12, COLORED);
-//      sprintf (atmData, "Time: %02d:%02d:%02d", sTime.Hours, sTime.Minutes, sTime.Seconds);
-//      Paint_DrawStringAt (&paint, 0, 74, atmData, &Font12, COLORED);
-//      EPD_SetFrameMemory (&epd, frame_buffer, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-//      EPD_DisplayFrame (&epd);
-//      EPD_Sleep (&epd);
 
-      process_AlarmB = UI_RunOneMinuteProcess ();
+      UI_RunOneMinuteProcess ();
+      process_AlarmB = INACTIVE;
     }
 
 #ifdef USB_CDC_IS_ACTIVE

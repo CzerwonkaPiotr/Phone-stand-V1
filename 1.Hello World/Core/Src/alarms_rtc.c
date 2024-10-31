@@ -90,6 +90,7 @@ void SetGPSAlarmB(void)
 
   sAlarm.AlarmSubSecondMask = RTC_ALARMSUBSECONDMASK_ALL;
   sAlarm.Alarm = RTC_ALARM_B;
+
   if (HAL_RTC_SetAlarm_IT (&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
     {
       Error_Handler ();

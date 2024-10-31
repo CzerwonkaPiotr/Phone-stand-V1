@@ -11,6 +11,7 @@
 #include "local_time.h"
 #include "rtc.h"
 #include "alarms_rtc.h"
+#include "usart.h"
 
 #define RX_BUFFER_SIZE 256
 //#define USB_CDC_IS_ACTIVE // Turn on and off printf functionality
@@ -157,7 +158,9 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
 		  GPSDataState = DATA_RECEIVED;
 		}
 	    }
-	  if (strncmp ((char*) rx_buffer, "$GPZDA", 6) != 0 && rx_data == '\n') // If there are unnecessary messages send configure gps
+      if (strncmp ((char*) rx_buffer, "$GPZD"
+		   "A",
+		   6) != 0 && rx_data == '\n') // If there are unnecessary messages send configure gps
 	    {
 	      GPS_SendCommands ();
 	    }
@@ -181,7 +184,7 @@ uint8_t GPS_RunProcess (void)
 {
   if (GPSDataState == NO_DATA_NEEDED)
   {
-    HAL_UART_Receive_IT (gps_huart, (uint8_t*) &rx_data, 1); // setting UART IT capture again
+    GPS_Init (&huart1);
     GPSDataState = WAITING_FOR_DATA;
 #ifdef USB_CDC_IS_ACTIVE
       printf ("-> No GPS data was needed but now it is, turn on IT on UART\n\r");
@@ -194,21 +197,14 @@ uint8_t GPS_RunProcess (void)
 #ifdef USB_CDC_IS_ACTIVE
       printf ("-> Waiting for data from GPS, notReceivedDataCount = %d\n\r", notReceivedDataCount);
 #endif
-    if (notReceivedDataCount > 9)
+    if (notReceivedDataCount > 19)
     {
       GPS_Sleep ();
-      HAL_Delay (1000);
+      HAL_Delay (10);
       GPS_Wakeup ();
-      HAL_Delay (1000);
+      HAL_Delay (10);
       GPS_SendCommands ();
       notReceivedDataCount = 0;
-#ifdef USB_CDC_IS_ACTIVE
-	  printf ("-> GPS DATA NOT RECEIVED FOR 10S\n\r");
-#endif
-      SetGPSAlarmADataNOk ();
-      GPSDataState = NO_DATA_NEEDED;
-      return 0;
-
     }
     else notReceivedDataCount++;
   }

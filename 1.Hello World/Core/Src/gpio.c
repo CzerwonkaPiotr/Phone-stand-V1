@@ -84,14 +84,6 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(SPI_BUSY_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PA6 PA8 PA11 PA12
-                           PA15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_8|GPIO_PIN_11|GPIO_PIN_12
-                          |GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /*Configure GPIO pin : PtPin */
   GPIO_InitStruct.Pin = BUTTON2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
@@ -107,6 +99,12 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PA8 PA11 PA12 PA15 */
+  GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_15;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
 }
 
