@@ -56,6 +56,8 @@
 
 /* External variables --------------------------------------------------------*/
 extern RTC_HandleTypeDef hrtc;
+extern DMA_HandleTypeDef hdma_tim3_ch1_trig;
+extern TIM_HandleTypeDef htim3;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
@@ -211,6 +213,34 @@ void EXTI0_IRQHandler(void)
   /* USER CODE BEGIN EXTI0_IRQn 1 */
 
   /* USER CODE END EXTI0_IRQn 1 */
+}
+
+/**
+  * @brief This function handles DMA1 stream4 global interrupt.
+  */
+void DMA1_Stream4_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Stream4_IRQn 0 */
+
+  /* USER CODE END DMA1_Stream4_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_tim3_ch1_trig);
+  /* USER CODE BEGIN DMA1_Stream4_IRQn 1 */
+
+  /* USER CODE END DMA1_Stream4_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM3 global interrupt.
+  */
+void TIM3_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM3_IRQn 0 */
+
+  /* USER CODE END TIM3_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim3);
+  /* USER CODE BEGIN TIM3_IRQn 1 */
+
+  /* USER CODE END TIM3_IRQn 1 */
 }
 
 /**

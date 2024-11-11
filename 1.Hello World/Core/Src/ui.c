@@ -27,7 +27,7 @@
 #define LED_SEQUENCE_POSITION_AMOUNT  3
 #define LED_DURATION_POSITION_AMOUNT  4
 
-#define BKP_POSITION_REGISTER RTC_BKP_DR1
+#define BKP_UI_SETTINGS_REGISTER RTC_BKP_DR1
 #define CHART_TYPE_REG_OFFSET 0
 #define CHART_RANGE_REG_OFFSET 8
 #define LED_SEQUENCE_REG_OFFSET 16
@@ -74,12 +74,14 @@ void UI_Init (void)
 
   //settings backup
 //  HAL_PWR_EnableBkUpAccess ();//
-//  uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//  uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_UI_SETTINGS_REGISTER);
 //  chartTypeSetPosition = (uint8_t) ((regTemp >> CHART_TYPE_REG_OFFSET) & 0xFF);
 //  chartRangeSetPosition = (uint8_t) ((regTemp >> CHART_RANGE_REG_OFFSET) & 0xFF);
 //  ledSequenceSetPosition = (uint8_t) ((regTemp >> LED_SEQUENCE_REG_OFFSET) & 0xFF);
 //  ledDurationSetPosition = (uint8_t) ((regTemp >> LED_DURATION_REG_OFFSET) & 0xFF);
 //  HAL_PWR_DisableBkUpAccess ();
+
+  ButtonInitKey (&userButton, BUTTON1_GPIO_Port, BUTTON1_Pin, 10, 1000, 2000);
 
   if (EPD_Init (&epd, lut_full_update) != 0)
   {
@@ -91,7 +93,7 @@ void UI_Init (void)
     Error_Handler ();
   }
   Paint_Init (&paint, frame_buffer_p, epd.width, epd.height);
-  Paint_Clear (&paint, UNCOLORED);
+  //Paint_Clear (&paint, UNCOLORED);
 }
 
 void GetBatteryLevel (void)
@@ -177,34 +179,96 @@ void UI_FullUpdateCurrentScreen (void)
   }
   else if (currentScreen == CHARTS)
   {
+    float valueMax = 25.5, valueMin = 25.5, valueNow = 25.5;
+
     for (uint8_t i = 0; i < 12; i++)
     {
-      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 28, 7, COLORED);
-      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 68, 7, COLORED);
-      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 108, 7, COLORED);
+      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 31, 7, COLORED);
+      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 71, 7, COLORED);
+      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 111, 7, COLORED);
       if (i != 0 && i != 6)
       {
-	Paint_DrawVerticalLine (&paint, 8 + (i * 20), 112, 5, COLORED);
-	Paint_DrawVerticalLine (&paint, 18 + (i * 20), 112, 5, COLORED);
+	Paint_DrawVerticalLine (&paint, 8 + (i * 20), 115, 5, COLORED);
+	Paint_DrawVerticalLine (&paint, 18 + (i * 20), 115, 5, COLORED);
       }
     }
     if (chartTypeSetPosition == TEMPERATURE_CHART)
     {
       sprintf (temp, "Temperature");
       Paint_DrawStringAt (&paint, 53, 5, temp, &Font24, COLORED);
+      sprintf (temp, "%.1fMax", valueMax);
+      Paint_DrawStringAt (&paint, 245, 27, temp, &Font12, COLORED);
+      sprintf (temp, "%.1f'C", valueNow);
+      Paint_DrawStringAt (&paint, 247, 67, temp, &Font12, COLORED);
+      sprintf (temp, "%.1fMin", valueMin);
+      Paint_DrawStringAt (&paint, 245, 107, temp, &Font12, COLORED);
     }
     else if (chartTypeSetPosition == HUMIDITY_CHART)
     {
-
+      sprintf (temp, "Humidity");
+      Paint_DrawStringAt (&paint, 75, 5, temp, &Font24, COLORED);
+      sprintf (temp, "%02d%%Max", (int) valueMax);
+      Paint_DrawStringAt (&paint, 245, 27, temp, &Font12, COLORED);
+      sprintf (temp, "%02d%%Rh", (int) valueNow);
+      Paint_DrawStringAt (&paint, 247, 67, temp, &Font12, COLORED);
+      sprintf (temp, "%02d%%Min", (int) valueMin);
+      Paint_DrawStringAt (&paint, 245, 107, temp, &Font12, COLORED);
     }
     else if (chartTypeSetPosition == PRESSURE_CHART)
     {
-
+      sprintf (temp, "Pressure");
+      Paint_DrawStringAt (&paint, 75, 5, temp, &Font24, COLORED);
+      sprintf (temp, "%04dMax", (int) valueMax);
+      Paint_DrawStringAt (&paint, 245, 27, temp, &Font12, COLORED);
+      sprintf (temp, "%04dhPa", (int) valueNow);
+      Paint_DrawStringAt (&paint, 245, 67, temp, &Font12, COLORED);
+      sprintf (temp, "%04dMin", (int) valueMin);
+      Paint_DrawStringAt (&paint, 245, 107, temp, &Font12, COLORED);
     }
     else if (chartTypeSetPosition == BATTERY_LEVEL_CHART)
     {
-
+      sprintf (temp, "Battery level");
+      Paint_DrawStringAt (&paint, 40, 5, temp, &Font24, COLORED);
+      sprintf (temp, "100%%");
+      Paint_DrawStringAt (&paint, 250, 27, temp, &Font12, COLORED);
+      sprintf (temp, "%d%%", (int) valueNow);
+      Paint_DrawStringAt (&paint, 252, 67, temp, &Font12, COLORED);
+      sprintf (temp, "0%%");
+      Paint_DrawStringAt (&paint, 255, 107, temp, &Font12, COLORED);
     }
+
+    if (chartRangeSetPosition == RANGE_8H)
+    {
+      sprintf (temp, "8");
+      Paint_DrawStringAt (&paint, 10, 113, temp, &Font12, COLORED);
+      sprintf (temp, "4");
+      Paint_DrawStringAt (&paint, 130, 113, temp, &Font12, COLORED);
+    }
+    else if (chartRangeSetPosition == RANGE_48H)
+    {
+      sprintf (temp, "48");
+      Paint_DrawStringAt (&paint, 7, 113, temp, &Font12, COLORED);
+      sprintf (temp, "24");
+      Paint_DrawStringAt (&paint, 127, 113, temp, &Font12, COLORED);
+    }
+    else if (chartRangeSetPosition == RANGE_168H)
+    {
+      sprintf (temp, "168");
+      Paint_DrawStringAt (&paint, 5, 113, temp, &Font12, COLORED);
+      sprintf (temp, "84");
+      Paint_DrawStringAt (&paint, 127, 113, temp, &Font12, COLORED);
+    }
+    if (chartSettingGroup == CHART_EDIT_TYPE_GROUP)
+    {
+      sprintf (temp, "\"");
+      Paint_DrawStringAt (&paint, 260, 0, temp, &Font24, COLORED);
+    }
+    else if (chartSettingGroup == CHART_EDIT_RANGE_GROUP)
+    {
+      sprintf (temp, "\"");
+      Paint_DrawStringAt (&paint, 5, 85, temp, &Font24, COLORED);
+    }
+
     EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
     EPD_DisplayFrame (&epd);
     EPD_Sleep (&epd);
@@ -274,33 +338,33 @@ void UI_EnterSettingsCallback (void)
 }
 void UI_NextPositionOnMenuCallback (void)
 {
-if (currentScreen == CLOCK)
-{
-  // no settings here
-}
-else if (currentScreen == CHARTS)
-{
-  if (chartSettingGroup == CHART_EDIT_TYPE_GROUP)
+  if (currentScreen == CLOCK)
   {
-    chartTypeSetPosition = (chartTypeSetPosition + 1) % CHART_TYPE_POSITION_AMOUNT;
+    // no settings here
   }
-  else if (chartSettingGroup == CHART_EDIT_RANGE_GROUP)
+  else if (currentScreen == CHARTS)
   {
-    chartRangeSetPosition = (chartRangeSetPosition + 1) % CHART_RANGE_POSITION_AMOUNT;
+    if (chartSettingGroup == CHART_EDIT_TYPE_GROUP)
+    {
+      chartTypeSetPosition = (chartTypeSetPosition % CHART_TYPE_POSITION_AMOUNT) + 1;
+    }
+    else if (chartSettingGroup == CHART_EDIT_RANGE_GROUP)
+    {
+      chartRangeSetPosition = (chartRangeSetPosition % CHART_RANGE_POSITION_AMOUNT) + 1;
+    }
   }
-}
-else if (currentScreen == LEDS)
-{
-  if (ledSettingGroup == LED_EDIT_SEQUENCE_GROUP)
+  else if (currentScreen == LEDS)
   {
-      ledSequenceSetPosition = (ledSequenceSetPosition + 1) % LED_SEQUENCE_POSITION_AMOUNT;
+    if (ledSettingGroup == LED_EDIT_SEQUENCE_GROUP)
+    {
+      ledSequenceSetPosition = (ledSequenceSetPosition % LED_SEQUENCE_POSITION_AMOUNT) + 1;
+    }
+    else if (ledSettingGroup == LED_EDIT_DURATION_GROUP)
+    {
+      ledDurationSetPosition = (ledDurationSetPosition % LED_DURATION_POSITION_AMOUNT) + 1;
+    }
   }
-  else if (ledSettingGroup == LED_EDIT_DURATION_GROUP)
-  {
-      ledDurationSetPosition = (ledDurationSetPosition + 1) % LED_DURATION_POSITION_AMOUNT;
-  }
-}
-UI_FullUpdateCurrentScreen ();
+  UI_FullUpdateCurrentScreen ();
 }
 void UI_NextSettingsGroupCallback (void)
 {
@@ -312,23 +376,23 @@ void UI_NextSettingsGroupCallback (void)
   {
 
 //    HAL_PWR_EnableBkUpAccess ();
-//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_UI_SETTINGS_REGISTER);
 //    regTemp = (regTemp & 0xFFFFFF00) | (chartTypeSetPosition << CHART_TYPE_REG_OFFSET);
-//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_UI_SETTINGS_REGISTER, regTemp);
 //    HAL_PWR_DisableBkUpAccess ();
 
-  chartSettingGroup = CHART_EDIT_RANGE_GROUP;
+    chartSettingGroup = CHART_EDIT_RANGE_GROUP;
   }
   else if (currentScreen == LEDS)
   {
 
 //    HAL_PWR_EnableBkUpAccess ();
-//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_UI_SETTINGS_REGISTER);
 //    regTemp = (regTemp & 0xFF00FFFF) | (ledSequenceSetPosition << LED_SEQUENCE_REG_OFFSET);
-//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_UI_SETTINGS_REGISTER, regTemp);
 //    HAL_PWR_DisableBkUpAccess ();
 
-  ledSettingGroup = LED_EDIT_DURATION_GROUP;
+    ledSettingGroup = LED_EDIT_DURATION_GROUP;
   }
   ButtonRegisterLongPressCallback (&userButton, UI_ExitSettingsCallback);
   UI_FullUpdateCurrentScreen ();
@@ -343,9 +407,9 @@ void UI_ExitSettingsCallback (void)
   {
 
 //    HAL_PWR_EnableBkUpAccess ();
-//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_UI_SETTINGS_REGISTER);
 //    regTemp = (regTemp & 0xFFFF00FF) | (chartRangeSetPosition << CHART_RANGE_REG_OFFSET);
-//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_UI_SETTINGS_REGISTER, regTemp);
 //    HAL_PWR_DisableBkUpAccess ();
 
   chartSettingGroup = CHART_EDIT_NO_GROUP;
@@ -354,9 +418,9 @@ void UI_ExitSettingsCallback (void)
   {
 
 //    HAL_PWR_EnableBkUpAccess ();
-//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_POSITION_REGISTER);
+//    uint32_t regTemp = HAL_RTCEx_BKUPRead (&hrtc, BKP_UI_SETTINGS_REGISTER);
 //    regTemp = (regTemp & 0x00FFFFFF) | (ledDurationSetPosition << LED_DURATION_REG_OFFSET);
-//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_POSITION_REGISTER, regTemp);
+//    HAL_RTCEx_BKUPWrite (&hrtc, BKP_UI_SETTINGS_REGISTER, regTemp);
 //    HAL_PWR_DisableBkUpAccess ();
 
   ledSettingGroup = LED_EDIT_NO_GROUP;

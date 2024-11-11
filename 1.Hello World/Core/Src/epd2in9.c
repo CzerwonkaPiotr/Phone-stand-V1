@@ -27,6 +27,7 @@
 #include <epd2in9.h>
 #include <epdif.h>
 #include <stdlib.h>
+#include "rtc.h"
 
 /* private functions */
 static void EPD_SetLut (EPD *epd, const unsigned char *lut);
@@ -46,26 +47,26 @@ int EPD_Init(EPD* epd, const unsigned char* lut) {
   }
   epd->lut = lut;
   /* EPD hardware init start */
-  EPD_Reset(epd);
-  EPD_SendCommand(epd, DRIVER_OUTPUT_CONTROL);
-  EPD_SendData(epd, (EPD_HEIGHT - 1) & 0xFF);
-  EPD_SendData(epd, ((EPD_HEIGHT - 1) >> 8) & 0xFF);
-  EPD_SendData(epd, 0x00);                     // GD = 0; SM = 0; TB = 0;
-  EPD_SendCommand(epd, BOOSTER_SOFT_START_CONTROL);
-  EPD_SendData(epd, 0xD7);
-  EPD_SendData(epd, 0xD6);
-  EPD_SendData(epd, 0x9D);
-  EPD_SendCommand(epd, WRITE_VCOM_REGISTER);
-  EPD_SendData(epd, 0xA8);                     // VCOM 7C
-  EPD_SendCommand(epd, SET_DUMMY_LINE_PERIOD);
-  EPD_SendData(epd, 0x1A);                     // 4 dummy lines per gate
-  EPD_SendCommand(epd, SET_GATE_TIME);
-  EPD_SendData(epd, 0x08);                     // 2us per line
+  EPD_Reset (epd);
+  EPD_SendCommand (epd, DRIVER_OUTPUT_CONTROL);
+  EPD_SendData (epd, (EPD_HEIGHT - 1) & 0xFF);
+  EPD_SendData (epd, ((EPD_HEIGHT - 1) >> 8) & 0xFF);
+  EPD_SendData (epd, 0x00);                     // GD = 0; SM = 0; TB = 0;
+  EPD_SendCommand (epd, BOOSTER_SOFT_START_CONTROL);
+  EPD_SendData (epd, 0xD7);
+  EPD_SendData (epd, 0xD6);
+  EPD_SendData (epd, 0x9D);
+  EPD_SendCommand (epd, WRITE_VCOM_REGISTER);
+  EPD_SendData (epd, 0xA8);                     // VCOM 7C
+  EPD_SendCommand (epd, SET_DUMMY_LINE_PERIOD);
+  EPD_SendData (epd, 0x1A);                     // 4 dummy lines per gate
+  EPD_SendCommand (epd, SET_GATE_TIME);
+  EPD_SendData (epd, 0x08);                     // 2us per line
   EPD_SendCommand (epd, BORDER_WAVEFORM_CONTROL);
   EPD_SendData (epd, 0x00);
-  EPD_SendCommand(epd, DATA_ENTRY_MODE_SETTING);
-  EPD_SendData(epd, 0x03);                     // X increment; Y increment
-  EPD_SetLut(epd, epd->lut);
+  EPD_SendCommand (epd, DATA_ENTRY_MODE_SETTING);
+  EPD_SendData (epd, 0x03);                     // X increment; Y increment
+  EPD_SetLut (epd, epd->lut);
   /* EPD hardware init end */
   return 0;
 }

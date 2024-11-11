@@ -56,7 +56,7 @@ void ButtonRegisterRepeatCallback (TButton *Key, void (*Callback) (void))
 void ButtonIdleRoutine (TButton *Key)
 {
   // Check if button was pressed
-  if (GPIO_PIN_RESET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
+  if (GPIO_PIN_SET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
   {
     // Button was pressed for the first time
     Key->State = DEBOUNCE; // Jump to DEBOUNCE State
@@ -70,7 +70,7 @@ void ButtonDebounceRoutine (TButton *Key)
   if ((HAL_GetTick () - Key->LastTick) > Key->TimerDebounce)
   {
     // After Debounce Timer elapsed check if button is still pressed
-    if (GPIO_PIN_RESET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
+    if (GPIO_PIN_SET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
     {
       // Still pressed
       Key->State = PRESSED; // Jump to PRESSED state
@@ -94,7 +94,7 @@ void ButtonDebounceRoutine (TButton *Key)
 void ButtonPressedRoutine (TButton *Key)
 {
   // Check if button was released
-  if (GPIO_PIN_SET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
+  if (GPIO_PIN_RESET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
   {
     if (Key->ButtonPressed != NULL) // Check if callback for pressed button exists
     {
@@ -122,7 +122,7 @@ void ButtonPressedRoutine (TButton *Key)
 void ButtonRepeatRoutine (TButton *Key)
 {
   // Check if button was released
-  if (GPIO_PIN_SET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
+  if (GPIO_PIN_RESET == HAL_GPIO_ReadPin (Key->GpioPort, Key->GpioPin))
   {
     // If released - go back to IDLE state
     Key->State = IDLE;

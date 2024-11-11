@@ -140,7 +140,7 @@ void HAL_UART_RxCpltCallback (UART_HandleTypeDef *huart)
   if (huart->Instance == gps_huart->Instance)
     {
 #ifdef USB_CDC_IS_ACTIVE
-      printf ("%c", rx_data); //TODO it's here just for debugging purposes
+      printf ("%c", rx_data);
 #endif
 
       if (rx_index < RX_BUFFER_SIZE )

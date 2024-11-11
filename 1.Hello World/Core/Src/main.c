@@ -19,9 +19,11 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "dma.h"
 #include "i2c.h"
 #include "rtc.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -34,6 +36,8 @@
 #include "NEO_6M.h"
 #include "alarms_rtc.h"
 #include "ui.h"
+
+#include "led_ws2812b.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -72,6 +76,7 @@ uint8_t ReceivedData[64]; // A buffer for parsing
 volatile uint8_t process_AlarmA;
 volatile uint8_t process_AlarmB;
 volatile uint8_t process_UserMenu;
+
 volatile uint8_t UserMenuFirstUse = 0;
 // 0 - button wasn't pressed
 // 1 - button was pressed and initial screen change has to be done
@@ -79,6 +84,8 @@ volatile uint8_t UserMenuFirstUse = 0;
 
 wakeUpSource_t wakeUpSource = 0;
 uint32_t process_UserMenuTimer = 0;
+#define NUMBER_OF_LEDS 15
+neopixel_led leds[NUMBER_OF_LEDS +1];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,6 +106,7 @@ static void MX_NVIC_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+  /* Get the TR register */
 
   /* USER CODE END 1 */
 
@@ -108,6 +116,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -119,19 +128,20 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_I2C1_Init();
   MX_USART1_UART_Init();
   MX_RTC_Init();
   MX_SPI1_Init();
   MX_ADC1_Init();
+  MX_TIM3_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
-
+  wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
   UI_Init ();
 
-  wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
   if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) == SET && __HAL_PWR_GET_FLAG(PWR_FLAG_WU) == SET) // Check and handle if the system was resumed from StandBy mode
   {
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);  	// Clear Standby flag
@@ -189,18 +199,21 @@ int main(void)
       break;
   };
   HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
+  LED_SetAllLeds(leds, NUMBER_OF_LEDS);
+  HAL_TIM_PWM_Start_DMA(&htim3, TIM_CHANNEL_1, (uint32_t*)leds, NUMBER_OF_LEDS * 24 + 24);
+  HAL_Delay(300);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    if (((HAL_GetTick () - process_UserMenuTimer) < 10000) && process_UserMenu == ACTIVE)
+    if (((HAL_GetTick () - process_UserMenuTimer) < 20000) && process_UserMenu == ACTIVE)
     {
       UI_RunMenuProcess (UserMenuFirstUse);
       UserMenuFirstUse = 2;
     }
-    else if (((HAL_GetTick () - process_UserMenuTimer) > 10000) && process_UserMenu == ACTIVE)
+    else if (((HAL_GetTick () - process_UserMenuTimer) >= 20000) && process_UserMenu == ACTIVE)
     {
       UI_ShowClockScreen ();
       UserMenuFirstUse = 0;
@@ -250,6 +263,9 @@ int main(void)
 
     if (process_AlarmA == INACTIVE && process_AlarmB == INACTIVE && process_UserMenu == INACTIVE)
     {
+      LED_ResetAllLeds(leds, NUMBER_OF_LEDS);
+      HAL_TIM_PWM_Start_DMA(&htim3, TIM_CHANNEL_1, (uint32_t*)leds, NUMBER_OF_LEDS * 24 + 24);
+      HAL_Delay(300);
 #ifdef USB_CDC_IS_ACTIVE
       //printf ("-> Going to standby mode\n\r");
 #endif
@@ -387,7 +403,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   // Clear the EXTI Line 0 flag (for WKUP pin)
   __HAL_GPIO_EXTI_CLEAR_IT(EXTI_LINE_0);
 }
-
+void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
+{
+  HAL_TIM_PWM_Stop_DMA(&htim3, TIM_CHANNEL_1);
+  htim3.Instance->CCR1 = 0;
+}
 /* USER CODE END 4 */
 
 /**
