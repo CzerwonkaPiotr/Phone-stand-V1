@@ -36,7 +36,6 @@
 #include "NEO_6M.h"
 #include "alarms_rtc.h"
 #include "ui.h"
-
 #include "led_ws2812b.h"
 /* USER CODE END Includes */
 
@@ -76,6 +75,8 @@ uint8_t ReceivedData[64]; // A buffer for parsing
 volatile uint8_t process_AlarmA;
 volatile uint8_t process_AlarmB;
 volatile uint8_t process_UserMenu;
+volatile uint8_t update_LED;
+uint8_t process_LED;
 
 volatile uint8_t UserMenuFirstUse = 0;
 // 0 - button wasn't pressed
@@ -84,8 +85,7 @@ volatile uint8_t UserMenuFirstUse = 0;
 
 wakeUpSource_t wakeUpSource = 0;
 uint32_t process_UserMenuTimer = 0;
-#define NUMBER_OF_LEDS 15
-neopixel_led leds[NUMBER_OF_LEDS +1];
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -106,8 +106,6 @@ static void MX_NVIC_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-  /* Get the TR register */
-
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -135,6 +133,8 @@ int main(void)
   MX_SPI1_Init();
   MX_ADC1_Init();
   MX_TIM3_Init();
+  MX_SPI2_Init();
+  MX_TIM4_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
@@ -198,10 +198,7 @@ int main(void)
       }
       break;
   };
-  HAL_GPIO_WritePin (LED1_GPIO_Port, LED1_Pin, GPIO_PIN_RESET);
-  LED_SetAllLeds(leds, NUMBER_OF_LEDS);
-  HAL_TIM_PWM_Start_DMA(&htim3, TIM_CHANNEL_1, (uint32_t*)leds, NUMBER_OF_LEDS * 24 + 24);
-  HAL_Delay(300);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -232,16 +229,16 @@ int main(void)
     //
     //// Alarm B sequence
     //
-
-    if (process_AlarmB == ACTIVE && process_AlarmA == INACTIVE)
+    if (process_AlarmB == ACTIVE /*&& process_AlarmA == INACTIVE*/)
     {
-
-//      BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
-//      //HAL_Delay (50); // TODO no delays allowed
-//      BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
-
       UI_RunOneMinuteProcess ();
       process_AlarmB = INACTIVE;
+    }
+
+    if (update_LED == ACTIVE)
+    {
+      process_LED = LED_RunProcess();
+      update_LED = INACTIVE;
     }
 
 #ifdef USB_CDC_IS_ACTIVE
@@ -261,11 +258,10 @@ int main(void)
 
     // TODO uruchom proces ledów
 
-    if (process_AlarmA == INACTIVE && process_AlarmB == INACTIVE && process_UserMenu == INACTIVE)
+    if (process_AlarmA == INACTIVE && process_AlarmB == INACTIVE && process_UserMenu == INACTIVE && process_LED == INACTIVE)
     {
-      LED_ResetAllLeds(leds, NUMBER_OF_LEDS);
-      HAL_TIM_PWM_Start_DMA(&htim3, TIM_CHANNEL_1, (uint32_t*)leds, NUMBER_OF_LEDS * 24 + 24);
-      HAL_Delay(300);
+
+
 #ifdef USB_CDC_IS_ACTIVE
       //printf ("-> Going to standby mode\n\r");
 #endif
@@ -273,6 +269,7 @@ int main(void)
       HAL_PWR_EnableWakeUpPin (PWR_WAKEUP_PIN1);
 
       /* Enter the Standby mode */
+      HAL_Delay(20);
       HAL_PWR_EnterSTANDBYMode ();
     }
 
@@ -346,6 +343,12 @@ static void MX_NVIC_Init(void)
   /* USART1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USART1_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(USART1_IRQn);
+  /* TIM4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(TIM4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(TIM4_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
@@ -393,7 +396,7 @@ void HAL_RTCEx_AlarmBEventCallback (RTC_HandleTypeDef *hrtc)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-  if (GPIO_Pin == BUTTON1_Pin)
+  if (GPIO_Pin == WKUP_BUTTON_Pin)
   {
     // Interrupt wakes up MCU
     process_UserMenu = ACTIVE;
@@ -405,8 +408,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 void HAL_TIM_PWM_PulseFinishedCallback(TIM_HandleTypeDef *htim)
 {
-  HAL_TIM_PWM_Stop_DMA(&htim3, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Stop_DMA(&htim3, TIM_CHANNEL_2);
   htim3.Instance->CCR1 = 0;
+}
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  update_LED = ACTIVE;
 }
 /* USER CODE END 4 */
 

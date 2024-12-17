@@ -28,63 +28,73 @@
 #include <epdif.h>
 #include "main.h"
 
-extern SPI_HandleTypeDef hspi1;
+extern SPI_HandleTypeDef hspi2;
 
-EPD_Pin epd_cs_pin = {
-  SPI_CS_GPIO_Port,
-  SPI_CS_Pin,
-};
+EPD_Pin epd_cs_pin =
+{
+EPD_SPI_CS_GPIO_Port,
+EPD_SPI_CS_Pin, };
 
 EPD_Pin epd_rst_pin =
-  {
-  SPI_RST_GPIO_Port,
-  SPI_RST_Pin, };
+{
+EPD_SPI_RST_GPIO_Port,
+EPD_SPI_RST_Pin, };
 
 EPD_Pin epd_dc_pin =
-  {
-  SPI_DC_GPIO_Port,
-  SPI_DC_Pin, };
+{
+EPD_SPI_DC_GPIO_Port,
+EPD_SPI_DC_Pin, };
 
 EPD_Pin epd_busy_pin =
-  {
-  SPI_BUSY_GPIO_Port,
-  SPI_BUSY_Pin,
-};
+{
+EPD_SPI_BUSY_GPIO_Port,
+EPD_SPI_BUSY_Pin, };
 
 EPD_Pin pins[4];
 
-void EpdDigitalWriteCallback(int pin_num, int value) {
-  if (value == HIGH) {
-    HAL_GPIO_WritePin((GPIO_TypeDef*)pins[pin_num].port, pins[pin_num].pin, GPIO_PIN_SET);
-  } else {
-    HAL_GPIO_WritePin((GPIO_TypeDef*)pins[pin_num].port, pins[pin_num].pin, GPIO_PIN_RESET);
+void EpdDigitalWriteCallback (int pin_num, int value)
+{
+  if (value == HIGH)
+  {
+    HAL_GPIO_WritePin ((GPIO_TypeDef*) pins[pin_num].port, pins[pin_num].pin, GPIO_PIN_SET);
+  }
+  else
+  {
+    HAL_GPIO_WritePin ((GPIO_TypeDef*) pins[pin_num].port, pins[pin_num].pin, GPIO_PIN_RESET);
   }
 }
 
-int EpdDigitalReadCallback(int pin_num) {
-  if (HAL_GPIO_ReadPin(pins[pin_num].port, pins[pin_num].pin) == GPIO_PIN_SET) {
+int EpdDigitalReadCallback (int pin_num)
+{
+  if (HAL_GPIO_ReadPin (pins[pin_num].port, pins[pin_num].pin) == GPIO_PIN_SET)
+  {
     return HIGH;
-  } else {
+  }
+  else
+  {
     return LOW;
   }
 }
 
-void EpdDelayMsCallback(unsigned int delaytime) {
-  HAL_Delay(delaytime);
+void EpdDelayMsCallback (unsigned int delaytime)
+{
+  HAL_Delay (delaytime);
 }
 
-void EpdSpiTransferCallback(unsigned char data) {
-  HAL_GPIO_WritePin((GPIO_TypeDef*)pins[CS_PIN].port, pins[CS_PIN].pin, GPIO_PIN_RESET);
-  HAL_SPI_Transmit(&hspi1, &data, 1, 1000);
-  HAL_GPIO_WritePin((GPIO_TypeDef*)pins[CS_PIN].port, pins[CS_PIN].pin, GPIO_PIN_SET);
+void EpdSpiTransferCallback (unsigned char data)
+{
+  HAL_GPIO_WritePin ((GPIO_TypeDef*) pins[CS_PIN].port, pins[CS_PIN].pin, GPIO_PIN_RESET);
+  HAL_SPI_Transmit_DMA (&hspi2, &data, 1);
+  HAL_GPIO_WritePin ((GPIO_TypeDef*) pins[CS_PIN].port, pins[CS_PIN].pin, GPIO_PIN_SET);
 }
 
-int EpdInitCallback(void) {
+int EpdInitCallback (void)
+{
   pins[CS_PIN] = epd_cs_pin;
   pins[RST_PIN] = epd_rst_pin;
   pins[DC_PIN] = epd_dc_pin;
   pins[BUSY_PIN] = epd_busy_pin;
-  
+
   return 0;
 }
 

@@ -63,11 +63,11 @@ void MX_RTC_Init(void)
   // Check if RTC was already initialized
   if (HAL_RTCEx_BKUPRead (&hrtc, RTC_BKP_DR0) == 0x5A5AA5A5)
   {
-    //HAL_PWR_DisableBkUpAccess (); // This makes sense to me but brakes the rtc alarm functionality so leave it comented
+    //HAL_PWR_DisableBkUpAccess (); // This makes sense to me but brakes the rtc alarm functionality so leave it as a note
     return;
   }
   HAL_RTCEx_BKUPWrite (&hrtc, RTC_BKP_DR0, 0x5A5AA5A5);
-  HAL_PWR_DisableBkUpAccess ();
+  //HAL_PWR_DisableBkUpAccess ();
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date
