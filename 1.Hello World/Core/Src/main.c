@@ -142,34 +142,14 @@ int main(void)
   wakeUpSource = Check_RTC_Alarm (); /**** check alarm wakeup ****/
   UI_Init ();
 
-  if (__HAL_PWR_GET_FLAG(PWR_FLAG_SB) == SET && __HAL_PWR_GET_FLAG(PWR_FLAG_WU) == SET) // Check and handle if the system was resumed from StandBy mode
-  {
-    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);  	// Clear Standby flag
-    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WU); 		// Clear Wkup flag
-    __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRAF);
-    __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRBF);
-    __HAL_GPIO_EXTI_CLEAR_IT(EXTI_LINE_0);
-  }
   switch (wakeUpSource)
   {
-    case WKUP_SRC_ALARM_A_DATA_NOK:
-      process_AlarmA = ACTIVE;
-      process_AlarmB = INACTIVE;
-      break;
-    case WKUP_SRC_ALARM_A_DATA_OK:
+    case WKUP_SRC_ALARM_A:
       process_AlarmA = ACTIVE;
       process_AlarmB = INACTIVE;
       break;
     case WKUP_SRC_ALARM_B:
       process_AlarmA = INACTIVE;
-      process_AlarmB = ACTIVE;
-      break;
-    case WKUP_SRC_ALARM_A_OR_B:
-      process_AlarmA = ACTIVE;
-      process_AlarmB = ACTIVE;
-      break;
-    case WKUP_SRC_BOOT_UP:
-      process_AlarmA = ACTIVE;
       process_AlarmB = ACTIVE;
       break;
     case WKUP_SRC_WKUP_PIN:
@@ -196,6 +176,11 @@ int main(void)
 	  Error_Handler ();
 	}
       }
+      break;
+    case WKUP_SRC_BOOT_UP:
+    default:
+      process_AlarmA = ACTIVE;
+      process_AlarmB = ACTIVE;
       break;
   };
 

@@ -11,11 +11,9 @@
 typedef enum
 {
   WKUP_SRC_BOOT_UP = 1,
-  WKUP_SRC_WKUP_PIN = 2,
-  WKUP_SRC_ALARM_A_DATA_OK = 3,
-  WKUP_SRC_ALARM_A_DATA_NOK = 4,
-  WKUP_SRC_ALARM_B = 5,
-  WKUP_SRC_ALARM_A_OR_B = 6
+  WKUP_SRC_WKUP_PIN ,
+  WKUP_SRC_ALARM_A,
+  WKUP_SRC_ALARM_B,
 } wakeUpSource_t;
 
 void SetGPSAlarmADataOk(void);
