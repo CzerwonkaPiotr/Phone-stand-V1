@@ -184,12 +184,19 @@ int main(void)
       break;
   };
 
+  if (!Flash_Init()) Error_Handler ();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+    uint8_t dataToWrite[256] = {1, 2, 3};
+    Flash_Write(0x000000, dataToWrite, 256);
+
+    uint8_t buffer[256];
+    Flash_Read(0x000000, buffer, 256); // Odczyt 256 bajtów od adresu 0x000000
+
     if (((HAL_GetTick () - process_UserMenuTimer) < 20000) && process_UserMenu == ACTIVE)
     {
       UI_RunMenuProcess (UserMenuFirstUse);

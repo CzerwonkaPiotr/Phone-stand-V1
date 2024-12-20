@@ -31,7 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "z_flash_W25QXXX.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -64,14 +64,14 @@ void Error_Handler(void);
 #define EPD_SPI_CS_GPIO_Port GPIOA
 #define EPD_SPI_DC_Pin GPIO_PIN_2
 #define EPD_SPI_DC_GPIO_Port GPIOA
-#define FLASH_SPI_CS_Pin GPIO_PIN_4
-#define FLASH_SPI_CS_GPIO_Port GPIOA
-#define FLASH_SPI1_SCK_Pin GPIO_PIN_5
-#define FLASH_SPI1_SCK_GPIO_Port GPIOA
-#define FLASH_SPI1_MISO_Pin GPIO_PIN_6
-#define FLASH_SPI1_MISO_GPIO_Port GPIOA
-#define FLASH_SPI1_MOSI_Pin GPIO_PIN_7
-#define FLASH_SPI1_MOSI_GPIO_Port GPIOA
+#define FLASH_CS_Pin GPIO_PIN_4
+#define FLASH_CS_GPIO_Port GPIOA
+#define FLASH_SCK_Pin GPIO_PIN_5
+#define FLASH_SCK_GPIO_Port GPIOA
+#define FLASH_MISO_Pin GPIO_PIN_6
+#define FLASH_MISO_GPIO_Port GPIOA
+#define FLASH_MOSI_Pin GPIO_PIN_7
+#define FLASH_MOSI_GPIO_Port GPIOA
 #define LIGHT_LEVEL_Pin GPIO_PIN_0
 #define LIGHT_LEVEL_GPIO_Port GPIOB
 #define BATTERY_LEVEL_Pin GPIO_PIN_1
