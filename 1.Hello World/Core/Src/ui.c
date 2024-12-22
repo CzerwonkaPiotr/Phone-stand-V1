@@ -21,6 +21,7 @@
 #include "alarms_rtc.h"
 #include "i2c.h"
 #include "led_ws2812b.h"
+#include "charts.h"
 
 
 #define CHART_TYPE_POSITION_AMOUNT  4
@@ -99,6 +100,10 @@ void UI_Init (void)
   {
     Error_Handler ();
   }
+  if (!Flash_Init ())
+  {
+    Error_Handler ();
+  }
   Paint_Init (&paint, frame_buffer_p, epd.width, epd.height);
   //Paint_Clear (&paint, UNCOLORED);
 }
@@ -130,25 +135,17 @@ void UI_FullUpdateCurrentScreen (void)
 {
   char text[128];
   Paint_Clear (&paint, UNCOLORED);
+  if (lastMinuteBMPRead != (RTC->TR & (RTC_TR_MNT_Msk | RTC_TR_MNU_Msk)) >> RTC_TR_MNU_Pos)// ensuring that this data is read no more than as once a minute
+  {
+    BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
+    HAL_Delay (50);
+    BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
+    GetBatteryLevel ();
+    lastMinuteBMPRead = (RTC->TR & (RTC_TR_MNT_Msk | RTC_TR_MNU_Msk)) >> RTC_TR_MNU_Pos;
+  }
 
   if (currentScreen == CLOCK)
   {
-    if (lastMinuteBMPRead != (RTC->TR & (RTC_TR_MNT_Msk | RTC_TR_MNU_Msk)) >> RTC_TR_MNU_Pos)// ensuring that this data is read no more than as once a minute
-    {
-      BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
-      HAL_Delay (50);
-      BMP280_ReadSensorData (&Bmp280, &Pressure, &Temperature, &Humidity);
-      GetBatteryLevel ();
-      lastMinuteBMPRead = (RTC->TR & (RTC_TR_MNT_Msk | RTC_TR_MNU_Msk)) >> RTC_TR_MNU_Pos;
-    }
-
-    //Draw Time
-    RTC_TimeTypeDef sTime =
-    { 0 };
-    HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
-    RTC_DateTypeDef sDate =
-    { 0 };
-    HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
     sprintf (text, "%02d", sTime.Hours);
     Paint_DrawStringAt (&paint, 8, 5, text, &Font64, COLORED);
     sprintf (text, "%02d", sTime.Minutes);
@@ -160,8 +157,9 @@ void UI_FullUpdateCurrentScreen (void)
     Paint_DrawFilledCircle (&paint, 131, 22, 5, COLORED); // Colon
     Paint_DrawFilledCircle (&paint, 131, 68, 5, COLORED); // Colon
 
-    sprintf (text, "%04dhPa", (int) Pressure);
-    Paint_DrawStringAt (&paint, 85, 110, text, &Font16, COLORED);
+    sprintf (text, "%dhPa", (int) Pressure);
+    if(Pressure >999 )Paint_DrawStringAt (&paint, 85, 110, text, &Font16, COLORED);
+    else Paint_DrawStringAt (&paint, 92, 110, text, &Font16, COLORED);
     sprintf (text, "%.1f'C", Temperature);
     Paint_DrawStringAt (&paint, 183, 91, text, &Font16, COLORED);
     sprintf (text, "%02d%%Rh", (int) Humidity);
@@ -184,10 +182,6 @@ void UI_FullUpdateCurrentScreen (void)
     else if (batteryLevel < 100) offsetBatteryLevel = 4;
     sprintf (text, "%ld%%", batteryLevel);
     Paint_DrawStringAt (&paint, 265 + offsetBatteryLevel, 5, text, &Font12, COLORED);
-
-    EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-    EPD_DisplayFrame (&epd);
-    EPD_Sleep (&epd);
   }
   else if (currentScreen == CHARTS)
   {
@@ -281,9 +275,8 @@ void UI_FullUpdateCurrentScreen (void)
       Paint_DrawStringAt (&paint, 5, 85, text, &Font24, COLORED);
     }
 
-    EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-    EPD_DisplayFrame (&epd);
-    EPD_Sleep (&epd);
+    CHARTS_DrawCharts(&paint, chartTypeSetPosition, chartRangeSetPosition);
+
   }
   else if (currentScreen == LEDS)
   {
@@ -345,11 +338,10 @@ void UI_FullUpdateCurrentScreen (void)
           sprintf (text, "\"");
           Paint_DrawStringAt (&paint, 270, 64, text, &Font24, COLORED);
         }
-
-    EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-    EPD_DisplayFrame (&epd);
-    EPD_Sleep (&epd);
   }
+  EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
+  EPD_DisplayFrame (&epd);
+  EPD_Sleep (&epd);
 }
 void UI_RunOneMinuteProcess (void)
 {
@@ -363,12 +355,22 @@ void UI_RunOneMinuteProcess (void)
       Paint_Clear (&paint, UNCOLORED);
       EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
       EPD_DisplayFrame (&epd);
-      // TODO zapisz dane z bme i baterii do Flash SPI
     }
     UI_FullUpdateCurrentScreen ();
     if ((sTime.Minutes % 10) == 0)
     {
-      // TODO zapisz dane z bme i baterii do Flash SPI
+      CHARTS_t data;
+      data.year = sDate.Year;
+      data.month = sDate.Month;
+      data.day = sDate.Date;
+      data.hour = sTime.Hours;
+      data.minute = sTime.Minutes;
+      data.temperature = Temperature;
+      data.humidity = (uint8_t)Humidity;
+      data.pressure = (uint16_t)Pressure;
+      data.battery_level = (uint8_t)batteryLevel;
+
+      CHARTS_SaveData(&data);
     }
   }
   SetGPSAlarmB ();

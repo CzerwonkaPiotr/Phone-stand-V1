@@ -184,7 +184,6 @@ int main(void)
       break;
   };
 
-  if (!Flash_Init()) Error_Handler ();
   /* USER CODE END 2 */
 
   /* Infinite loop */

@@ -505,7 +505,7 @@ uint8_t test=1;
  ******************************************************************/
 uint8_t Flash_Init(){
 uint32_t JedecID;
-	HAL_Delay(6);	// supposing init is called on system startup: 5 ms (tPUW) required after power-up to be fully available
+	//HAL_Delay(6);	// supposing init is called on system startup: 5 ms (tPUW) required after power-up to be fully available
 	Flash_Reset();
 	if (!Flash_TestAvailability())
 		return 0;
