@@ -25,6 +25,7 @@
  */
 
 #include <epdpaint.h>
+#include "stdlib.h"
 
 
 void Paint_Init(Paint* paint, unsigned char* image, int width, int height) {
@@ -193,21 +194,25 @@ void Paint_DrawStringAt(Paint* paint, int x, int y, const char* text, sFONT* fon
 *  @brief: this draws a line on the frame buffer
 */
 void Paint_DrawLine(Paint* paint, int x0, int y0, int x1, int y1, int colored) {
-    /* Bresenham algorithm */
-    int dx = x1 - x0 >= 0 ? x1 - x0 : x0 - x1;
-    int sx = x0 < x1 ? 1 : -1;
-    int dy = y1 - y0 <= 0 ? y1 - y0 : y0 - y1;
-    int sy = y0 < y1 ? 1 : -1;
-    int err = dx + dy;
+    /* Bresenham's Line Algorithm */
+    int dx = abs(x1 - x0); // Odległość na osi X
+    int sx = (x0 < x1) ? 1 : -1; // Kierunek na osi X
+    int dy = abs(y1 - y0); // Odległość na osi Y
+    int sy = (y0 < y1) ? 1 : -1; // Kierunek na osi Y
+    int err = dx - dy; // Wartość początkowego błędu
 
-    while((x0 != x1) && (y0 != y1)) {
-        Paint_DrawPixel(paint, x0, y0 , colored);
-        if (2 * err >= dy) {     
-            err += dy;
+    while (1) {
+        Paint_DrawPixel(paint, x0, y0, colored);  // Rysujemy aktualny piksel
+        if (x0 == x1 && y0 == y1) {
+            break;  // Koniec rysowania linii, gdy osiągnięto punkt końcowy
+        }
+        int e2 = 2 * err;
+        if (e2 > -dy) {  // Poprawka błędu dla osi Y
+            err -= dy;
             x0 += sx;
         }
-        if (2 * err <= dx) {
-            err += dx; 
+        if (e2 < dx) {  // Poprawka błędu dla osi X
+            err += dx;
             y0 += sy;
         }
     }

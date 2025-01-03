@@ -40,6 +40,7 @@ typedef struct
 #define LED_LOGICAL_ONE 18
 #define LED_LOGICAL_ZERO 6
 
+void LED_SetColorForLeds (uint16_t start_led, uint16_t end_led, rgb_color color);
 void LED_ResetAllLeds(neopixel_led* leds, uint16_t number_leds);
 void LED_SetAllLeds(neopixel_led* leds, uint16_t number_leds);
 void LED_SetSpecificLed(neopixel_led* leds, uint16_t led_position, rgb_color color);

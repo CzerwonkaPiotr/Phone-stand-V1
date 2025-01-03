@@ -36,8 +36,8 @@ typedef enum
 typedef enum
 {
   RANGE_8H = 1,
-  RANGE_48H,
-  RANGE_168H
+  RANGE_40H,
+  RANGE_160H
 } CHART_RANGE_POSITION_t;
 
 typedef enum
@@ -79,5 +79,6 @@ void UI_NextSettingsGroupCallback (void);
 void UI_ExitSettingsCallback (void);
 void UI_ShowClockScreen (void);
 void UI_Init (void);
+void UI_ResetDevice(void);
 
 #endif /* INC_UI_H_ */

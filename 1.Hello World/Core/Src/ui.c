@@ -55,7 +55,7 @@ static BMP280_t Bmp280;
 static float Temperature, Pressure, Humidity;
 static uint8_t lastMinuteBMPRead = 61; // 61 because it will always read data when MCU was in standby mode
 
-static int32_t batteryLevel;
+static float batteryLevel;
 
 static RTC_TimeTypeDef sTime =
 { 0 };
@@ -75,6 +75,7 @@ void UI_Init (void)
 {
   ButtonRegisterPressCallback (&userButton, UI_NextScreenCallback);
   ButtonRegisterLongPressCallback (&userButton, UI_EnterSettingsCallback);
+  ButtonRegisterRepeatCallback(&userButton, UI_ResetDevice);
 
   //settings backup
   HAL_PWR_EnableBkUpAccess ();//
@@ -90,7 +91,7 @@ void UI_Init (void)
   if(ledSequenceSetPosition == 0) ledSequenceSetPosition = 1;
   if(ledDurationSetPosition == 0) ledDurationSetPosition = 1;
 
-  ButtonInitKey (&userButton, WKUP_BUTTON_GPIO_Port, WKUP_BUTTON_Pin, 10, 1000, 2000);
+  ButtonInitKey (&userButton, WKUP_BUTTON_GPIO_Port, WKUP_BUTTON_Pin, 25, 1000, 8000);
   if (EPD_Init (&epd, lut_full_update) != 0)
   {
     //TODO error
@@ -106,10 +107,13 @@ void UI_Init (void)
   }
   Paint_Init (&paint, frame_buffer_p, epd.width, epd.height);
   //Paint_Clear (&paint, UNCOLORED);
+
+  HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
+  HAL_RTC_GetDate (&hrtc, &sDate, RTC_FORMAT_BIN);
 }
 static void GetBatteryLevel (void)
 {
-  float tempVar;
+  uint32_t tempVar;
   ADC_ChannelConfTypeDef sConfig = {0};
   sConfig.Channel = ADC_CHANNEL_9;
   sConfig.Rank = 1;
@@ -122,12 +126,12 @@ static void GetBatteryLevel (void)
 
   if (HAL_ADC_PollForConversion (&hadc1, HAL_MAX_DELAY) == HAL_OK)
   {
-    batteryLevel = HAL_ADC_GetValue (&hadc1);
+    tempVar = HAL_ADC_GetValue (&hadc1);
   }
   HAL_ADC_Stop (&hadc1);
 
-  tempVar = (float) ((batteryLevel - BATTERY_EMPTY_VALUE) / (float) (BATTERY_FULL_VALUE - BATTERY_EMPTY_VALUE));
-  batteryLevel = tempVar * 100;
+  batteryLevel = (float) ((tempVar - BATTERY_EMPTY_VALUE) / (float) (BATTERY_FULL_VALUE - BATTERY_EMPTY_VALUE));
+  batteryLevel = batteryLevel * 100;
   if (batteryLevel > 100) batteryLevel = 100;
   if (batteryLevel < 0) batteryLevel = 0;
 }
@@ -135,7 +139,7 @@ void UI_FullUpdateCurrentScreen (void)
 {
   char text[128];
   Paint_Clear (&paint, UNCOLORED);
-  if (lastMinuteBMPRead != (RTC->TR & (RTC_TR_MNT_Msk | RTC_TR_MNU_Msk)) >> RTC_TR_MNU_Pos)// ensuring that this data is read no more than as once a minute
+  if (lastMinuteBMPRead != (RTC->TR & (RTC_TR_MNT_Msk | RTC_TR_MNU_Msk)) >> RTC_TR_MNU_Pos) // ensuring that this data is read no more than as once a minute
   {
     BMP280_SetMode (&Bmp280, BMP280_FORCEDMODE); // Measurement is made and the sensor goes to sleep
     HAL_Delay (50);
@@ -158,7 +162,7 @@ void UI_FullUpdateCurrentScreen (void)
     Paint_DrawFilledCircle (&paint, 131, 68, 5, COLORED); // Colon
 
     sprintf (text, "%dhPa", (int) Pressure);
-    if(Pressure >999 )Paint_DrawStringAt (&paint, 85, 110, text, &Font16, COLORED);
+    if (Pressure > 999) Paint_DrawStringAt (&paint, 85, 110, text, &Font16, COLORED);
     else Paint_DrawStringAt (&paint, 92, 110, text, &Font16, COLORED);
     sprintf (text, "%.1f'C", Temperature);
     Paint_DrawStringAt (&paint, 183, 91, text, &Font16, COLORED);
@@ -180,169 +184,130 @@ void UI_FullUpdateCurrentScreen (void)
     uint8_t offsetBatteryLevel = 0;
     if (batteryLevel < 10) offsetBatteryLevel = 8;
     else if (batteryLevel < 100) offsetBatteryLevel = 4;
-    sprintf (text, "%ld%%", batteryLevel);
+    sprintf (text, "%02d%%", (int)batteryLevel);
     Paint_DrawStringAt (&paint, 265 + offsetBatteryLevel, 5, text, &Font12, COLORED);
   }
   else if (currentScreen == CHARTS)
   {
-    float valueMax = 25.5, valueMin = 25.5, valueNow = 25.5;// TODO
-
-    for (uint8_t i = 0; i < 12; i++)
+    if (sDate.Year == 0)
     {
-      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 31, 7, COLORED);
-      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 71, 7, COLORED);
-      Paint_DrawHorizontalLine (&paint, (10 + (i * 20)), 111, 7, COLORED);
-      if (i != 0 && i != 6)
+      sprintf (text, "NO GPS FIX");
+      Paint_DrawStringAt (&paint, ((SCREEN_WIDTH / 2) - (10 * 17 / 2)), ((SCREEN_HEIGHT / 2) - (24 / 2)), text, &Font24, COLORED);
+    }
+    else
+    {
+
+      for (uint8_t i = 0; i < 12; i++)
       {
-	Paint_DrawVerticalLine (&paint, 8 + (i * 20), 115, 5, COLORED);
-	Paint_DrawVerticalLine (&paint, 18 + (i * 20), 115, 5, COLORED);
+	Paint_DrawHorizontalLine (&paint, (4 + (i * 20)), 31, 7, COLORED);
+	Paint_DrawHorizontalLine (&paint, (4 + (i * 20)), 71, 7, COLORED);
+	Paint_DrawHorizontalLine (&paint, (4 + (i * 20)), 111, 7, COLORED);
+	if (i != 0 && i != 6)
+	{
+	  Paint_DrawVerticalLine (&paint, 2 + (i * 20), 115, 5, COLORED);
+	  Paint_DrawVerticalLine (&paint, 12 + (i * 20), 115, 5, COLORED);
+	}
+      }
+
+      if (chartRangeSetPosition == RANGE_8H)
+      {
+	sprintf (text, "8");
+	Paint_DrawStringAt (&paint, 4, 113, text, &Font12, COLORED);
+	sprintf (text, "4");
+	Paint_DrawStringAt (&paint, 124, 113, text, &Font12, COLORED);
+      }
+      else if (chartRangeSetPosition == RANGE_40H)
+      {
+	sprintf (text, "40");
+	Paint_DrawStringAt (&paint, 2, 113, text, &Font12, COLORED);
+	sprintf (text, "20");
+	Paint_DrawStringAt (&paint, 121, 113, text, &Font12, COLORED);
+      }
+      else if (chartRangeSetPosition == RANGE_160H)
+      {
+	sprintf (text, "160");
+	Paint_DrawStringAt (&paint, 0, 113, text, &Font12, COLORED);
+	sprintf (text, "80");
+	Paint_DrawStringAt (&paint, 121, 113, text, &Font12, COLORED);
+      }
+      if (chartSettingGroup == CHART_EDIT_TYPE_GROUP)
+      {
+	sprintf (text, "\"");
+	Paint_DrawStringAt (&paint, 260, 0, text, &Font24, COLORED);
+      }
+      else if (chartSettingGroup == CHART_EDIT_RANGE_GROUP)
+      {
+	sprintf (text, "\"");
+	Paint_DrawStringAt (&paint, 5, 85, text, &Font24, COLORED);
+      }
+      CHARTS_DrawCharts (&paint, chartTypeSetPosition, chartRangeSetPosition, sTime, sDate);
+    }
+  }
+
+    else if (currentScreen == LEDS)
+    {
+      Paint_DrawHorizontalLine (&paint, 5, SCREEN_HEIGHT / 2, SCREEN_WIDTH - 6, COLORED);
+
+      sprintf (text, "LED Mode");
+      Paint_DrawStringAt (&paint, 87, 5, text, &Font24, COLORED);
+      sprintf (text, "LED Duration");
+      Paint_DrawStringAt (&paint, 50, (SCREEN_HEIGHT / 2) + 4, text, &Font24, COLORED);
+
+      sprintf (text, "FADE");
+      Paint_DrawStringAt (&paint, 20, 38, text, &Font16, COLORED);
+      sprintf (text, "CIRCLE");
+      Paint_DrawStringAt (&paint, 85, 38, text, &Font16, COLORED);
+      sprintf (text, "SMOOTH");
+      Paint_DrawStringAt (&paint, 170, 38, text, &Font16, COLORED);
+      sprintf (text, "OFF");
+      Paint_DrawStringAt (&paint, 255, 38, text, &Font16, COLORED);
+
+      sprintf (text, "3s");
+      Paint_DrawStringAt (&paint, 32, 101, text, &Font16, COLORED);
+      sprintf (text, "5s");
+      Paint_DrawStringAt (&paint, 103, 101, text, &Font16, COLORED);
+      sprintf (text, "10s");
+      Paint_DrawStringAt (&paint, 177, 101, text, &Font16, COLORED);
+      sprintf (text, "INF");
+      Paint_DrawStringAt (&paint, 250, 101, text, &Font16, COLORED);
+
+      uint16_t offsetX, offsetY;
+
+      offsetY = 34;
+      if (ledSequenceSetPosition == FADE_LED_SEQUENCE) offsetX = 2;
+      else if (ledSequenceSetPosition == CIRCLE_LED_SEQUENCE) offsetX = 67;
+      else if (ledSequenceSetPosition == SMOOTH_LED_SEQUENCE) offsetX = 153;
+      else if (ledSequenceSetPosition == OFF_LED_SEQUENCE) offsetX = 237;
+      sprintf (text, "-");
+      Paint_DrawStringAt (&paint, offsetX, offsetY, text, &Font24, COLORED);
+      sprintf (text, ">");
+      Paint_DrawStringAt (&paint, offsetX + 3, offsetY, text, &Font24, COLORED);
+
+      offsetY = 97;
+      if (ledDurationSetPosition == DURATION_3S) offsetX = 15;
+      else if (ledDurationSetPosition == DURATION_5S) offsetX = 86;
+      else if (ledDurationSetPosition == DURATION_10S) offsetX = 160;
+      else if (ledDurationSetPosition == DURATION_INFINITE) offsetX = 233;
+      sprintf (text, "-");
+      Paint_DrawStringAt (&paint, offsetX, offsetY, text, &Font24, COLORED);
+      sprintf (text, ">");
+      Paint_DrawStringAt (&paint, offsetX + 3, offsetY, text, &Font24, COLORED);
+
+      if (ledSettingGroup == LED_EDIT_SEQUENCE_GROUP)
+      {
+	sprintf (text, "\"");
+	Paint_DrawStringAt (&paint, 270, 5, text, &Font24, COLORED);
+      }
+      else if (ledSettingGroup == LED_EDIT_DURATION_GROUP)
+      {
+	sprintf (text, "\"");
+	Paint_DrawStringAt (&paint, 270, 64, text, &Font24, COLORED);
       }
     }
-    if (chartTypeSetPosition == TEMPERATURE_CHART)
-    {
-      sprintf (text, "Temperature");
-      Paint_DrawStringAt (&paint, 53, 5, text, &Font24, COLORED);
-      sprintf (text, "%.1fMax", valueMax);
-      Paint_DrawStringAt (&paint, 245, 27, text, &Font12, COLORED);
-      sprintf (text, "%.1f'C", valueNow);
-      Paint_DrawStringAt (&paint, 247, 67, text, &Font12, COLORED);
-      sprintf (text, "%.1fMin", valueMin);
-      Paint_DrawStringAt (&paint, 245, 107, text, &Font12, COLORED);
-    }
-    else if (chartTypeSetPosition == HUMIDITY_CHART)
-    {
-      sprintf (text, "Humidity");
-      Paint_DrawStringAt (&paint, 75, 5, text, &Font24, COLORED);
-      sprintf (text, "%02d%%Max", (int) valueMax);
-      Paint_DrawStringAt (&paint, 245, 27, text, &Font12, COLORED);
-      sprintf (text, "%02d%%Rh", (int) valueNow);
-      Paint_DrawStringAt (&paint, 247, 67, text, &Font12, COLORED);
-      sprintf (text, "%02d%%Min", (int) valueMin);
-      Paint_DrawStringAt (&paint, 245, 107, text, &Font12, COLORED);
-    }
-    else if (chartTypeSetPosition == PRESSURE_CHART)
-    {
-      sprintf (text, "Pressure");
-      Paint_DrawStringAt (&paint, 75, 5, text, &Font24, COLORED);
-      sprintf (text, "%04dMax", (int) valueMax);
-      Paint_DrawStringAt (&paint, 245, 27, text, &Font12, COLORED);
-      sprintf (text, "%04dhPa", (int) valueNow);
-      Paint_DrawStringAt (&paint, 245, 67, text, &Font12, COLORED);
-      sprintf (text, "%04dMin", (int) valueMin);
-      Paint_DrawStringAt (&paint, 245, 107, text, &Font12, COLORED);
-    }
-    else if (chartTypeSetPosition == BATTERY_LEVEL_CHART)
-    {
-      sprintf (text, "Battery level");
-      Paint_DrawStringAt (&paint, 30, 5, text, &Font24, COLORED);
-      sprintf (text, "100%%");
-      Paint_DrawStringAt (&paint, 260, 27, text, &Font12, COLORED);
-      sprintf (text, "%d%%", (int) valueNow);
-      Paint_DrawStringAt (&paint, 262, 67, text, &Font12, COLORED);
-      sprintf (text, "0%%");
-      Paint_DrawStringAt (&paint, 265, 107, text, &Font12, COLORED);
-    }
-
-    if (chartRangeSetPosition == RANGE_8H)
-    {
-      sprintf (text, "8");
-      Paint_DrawStringAt (&paint, 10, 113, text, &Font12, COLORED);
-      sprintf (text, "4");
-      Paint_DrawStringAt (&paint, 130, 113, text, &Font12, COLORED);
-    }
-    else if (chartRangeSetPosition == RANGE_48H)
-    {
-      sprintf (text, "48");
-      Paint_DrawStringAt (&paint, 7, 113, text, &Font12, COLORED);
-      sprintf (text, "24");
-      Paint_DrawStringAt (&paint, 127, 113, text, &Font12, COLORED);
-    }
-    else if (chartRangeSetPosition == RANGE_168H)
-    {
-      sprintf (text, "168");
-      Paint_DrawStringAt (&paint, 5, 113, text, &Font12, COLORED);
-      sprintf (text, "84");
-      Paint_DrawStringAt (&paint, 127, 113, text, &Font12, COLORED);
-    }
-    if (chartSettingGroup == CHART_EDIT_TYPE_GROUP)
-    {
-      sprintf (text, "\"");
-      Paint_DrawStringAt (&paint, 260, 0, text, &Font24, COLORED);
-    }
-    else if (chartSettingGroup == CHART_EDIT_RANGE_GROUP)
-    {
-      sprintf (text, "\"");
-      Paint_DrawStringAt (&paint, 5, 85, text, &Font24, COLORED);
-    }
-
-    CHARTS_DrawCharts(&paint, chartTypeSetPosition, chartRangeSetPosition);
-
+    EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
+    EPD_DisplayFrame (&epd);
+    EPD_Sleep (&epd);
   }
-  else if (currentScreen == LEDS)
-  {
-    Paint_DrawHorizontalLine (&paint, 5, SCREEN_HEIGHT / 2, SCREEN_WIDTH -6, COLORED);
-
-    sprintf (text, "LED Mode");
-    Paint_DrawStringAt (&paint, 87, 5, text, &Font24, COLORED);
-    sprintf (text, "LED Duration");
-    Paint_DrawStringAt (&paint, 50, (SCREEN_HEIGHT/2) +4, text, &Font24, COLORED);
-
-    sprintf (text, "FADE");
-    Paint_DrawStringAt (&paint, 20, 38, text, &Font16, COLORED);
-    sprintf (text, "CIRCLE");
-    Paint_DrawStringAt (&paint, 85, 38, text, &Font16, COLORED);
-    sprintf (text, "SMOOTH");
-    Paint_DrawStringAt (&paint, 170, 38, text, &Font16, COLORED);
-    sprintf (text, "OFF");
-    Paint_DrawStringAt (&paint, 255, 38, text, &Font16, COLORED);
-
-    sprintf (text, "3s");
-    Paint_DrawStringAt (&paint, 32, 101, text, &Font16, COLORED);
-    sprintf (text, "5s");
-    Paint_DrawStringAt (&paint, 103, 101, text, &Font16, COLORED);
-    sprintf (text, "10s");
-    Paint_DrawStringAt (&paint, 177, 101, text, &Font16, COLORED);
-    sprintf (text, "INF");
-    Paint_DrawStringAt (&paint, 250, 101, text, &Font16, COLORED);
-
-
-    uint16_t offsetX, offsetY;
-
-    offsetY = 34;
-    if(ledSequenceSetPosition == FADE_LED_SEQUENCE) offsetX = 2;
-    else if(ledSequenceSetPosition == CIRCLE_LED_SEQUENCE) offsetX = 67;
-    else if (ledSequenceSetPosition == SMOOTH_LED_SEQUENCE) offsetX = 153;
-    else if (ledSequenceSetPosition == OFF_LED_SEQUENCE) offsetX = 237;
-    sprintf (text, "-");
-        Paint_DrawStringAt (&paint, offsetX, offsetY, text, &Font24, COLORED);
-        sprintf (text, ">");
-        Paint_DrawStringAt (&paint, offsetX+3, offsetY, text, &Font24, COLORED);
-
-    offsetY = 97;
-    if (ledDurationSetPosition == DURATION_3S) offsetX = 15;
-    else if (ledDurationSetPosition == DURATION_5S) offsetX = 86;
-    else if (ledDurationSetPosition == DURATION_10S) offsetX = 160;
-    else if (ledDurationSetPosition == DURATION_INFINITE) offsetX = 233;
-    sprintf (text, "-");
-        Paint_DrawStringAt (&paint, offsetX, offsetY, text, &Font24, COLORED);
-        sprintf (text, ">");
-        Paint_DrawStringAt (&paint, offsetX+3, offsetY, text, &Font24, COLORED);
-
-    if (ledSettingGroup == LED_EDIT_SEQUENCE_GROUP)
-        {
-          sprintf (text, "\"");
-          Paint_DrawStringAt (&paint, 270, 5, text, &Font24, COLORED);
-        }
-        else if (ledSettingGroup == LED_EDIT_DURATION_GROUP)
-        {
-          sprintf (text, "\"");
-          Paint_DrawStringAt (&paint, 270, 64, text, &Font24, COLORED);
-        }
-  }
-  EPD_SetFrameMemory (&epd, frame_buffer_p, 0, 0, Paint_GetWidth (&paint), Paint_GetHeight (&paint));
-  EPD_DisplayFrame (&epd);
-  EPD_Sleep (&epd);
-}
 void UI_RunOneMinuteProcess (void)
 {
   HAL_RTC_GetTime (&hrtc, &sTime, RTC_FORMAT_BIN);
@@ -357,17 +322,13 @@ void UI_RunOneMinuteProcess (void)
       EPD_DisplayFrame (&epd);
     }
     UI_FullUpdateCurrentScreen ();
-    if ((sTime.Minutes % 10) == 0)
+    if ((sTime.Minutes % 10) == 0 && sDate.Year != 0)
     {
       CHARTS_t data;
-      data.year = sDate.Year;
-      data.month = sDate.Month;
-      data.day = sDate.Date;
-      data.hour = sTime.Hours;
-      data.minute = sTime.Minutes;
+      data.epoch_seconds = RTC_ToEpochSeconds(&sTime, &sDate);
       data.temperature = Temperature;
-      data.humidity = (uint8_t)Humidity;
-      data.pressure = (uint16_t)Pressure;
+      data.humidity = Humidity;
+      data.pressure = Pressure;
       data.battery_level = (uint8_t)batteryLevel;
 
       CHARTS_SaveData(&data);
@@ -513,4 +474,17 @@ void UI_ShowClockScreen (void)
   ledSettingGroup = LED_EDIT_NO_GROUP;
   currentScreen = CLOCK;
   UI_FullUpdateCurrentScreen ();
+}
+void UI_ResetDevice()
+{
+  neopixel_led leds[16] = {0};
+  LED_SetAllLeds(leds, 16);
+  HAL_TIM_PWM_Start_DMA (&htim3, TIM_CHANNEL_2, (uint32_t*) leds, 16 * 24);
+  HAL_Delay(1000);
+  LED_ResetAllLeds(leds, 16);
+  HAL_TIM_PWM_Start_DMA (&htim3, TIM_CHANNEL_2, (uint32_t*) leds, 16 * 24);
+  HAL_Delay(50);
+  Flash_ChipErase();
+  GPS_Sleep();
+  HAL_NVIC_SystemReset();
 }

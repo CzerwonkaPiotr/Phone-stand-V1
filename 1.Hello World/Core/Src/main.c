@@ -190,11 +190,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    uint8_t dataToWrite[256] = {1, 2, 3};
-    Flash_Write(0x000000, dataToWrite, 256);
-
-    uint8_t buffer[256];
-    Flash_Read(0x000000, buffer, 256); // Odczyt 256 bajtów od adresu 0x000000
 
     if (((HAL_GetTick () - process_UserMenuTimer) < 20000) && process_UserMenu == ACTIVE)
     {
@@ -212,7 +207,7 @@ int main(void)
     //// Alarm A sequence
     //
 
-    if (process_AlarmA == ACTIVE)
+    if (process_AlarmA == ACTIVE && process_AlarmB == INACTIVE)
     {
       process_AlarmA = GPS_RunProcess ();
     }
@@ -220,7 +215,7 @@ int main(void)
     //
     //// Alarm B sequence
     //
-    if (process_AlarmB == ACTIVE /*&& process_AlarmA == INACTIVE*/)
+    if (process_AlarmB == ACTIVE )
     {
       UI_RunOneMinuteProcess ();
       process_AlarmB = INACTIVE;

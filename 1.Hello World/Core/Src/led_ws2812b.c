@@ -66,7 +66,7 @@ void LED_SetAllLeds (neopixel_led *leds, uint16_t number_leds)
     }
   }
 }
-static void LED_SetColorForLeds (uint16_t start_led, uint16_t end_led, rgb_color color)
+void LED_SetColorForLeds (uint16_t start_led, uint16_t end_led, rgb_color color)
 {
   // Check if LED range is valid
   if (start_led > end_led || end_led >= NUMBER_OF_LEDS || start_led < 0)
