@@ -10,159 +10,188 @@
 #include "main.h"
 #include "bmp280.h"
 
-//
-// Read 8 bits from BMP280 from Register
-//
+// ============================================================================
+// Utility Functions for BMP280/BME280 Sensor
+// ============================================================================
+
+/**
+ * @brief  Read an 8-bit value from a BMP280 register.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  Register: Address of the register to read from.
+ * @retval uint8_t: Value read from the register.
+ */
 uint8_t Read8(BMP280_t *bmp, uint8_t Register)
 {
 	uint8_t Value;
-
 	HAL_I2C_Mem_Read(bmp->bmp_i2c, ((bmp->Address)<<1), Register, 1, &Value, 1, BMP280_I2C_TIMEOUT);
-
 	return Value;
 }
 
-//
-// Write 8 bits to BMP280 to Register
-//
+/**
+ * @brief  Write an 8-bit value to a BMP280 register.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  Register: Address of the register to write to.
+ * @param  Value: Value to write to the register.
+ * @retval None
+ */
 void Write8(BMP280_t *bmp, uint8_t Register, uint8_t Value)
 {
 	HAL_I2C_Mem_Write(bmp->bmp_i2c, ((bmp->Address)<<1), Register, 1, &Value, 1, BMP280_I2C_TIMEOUT);
 }
 
-//
-// Read 16 bits from BMP280 from Register
-//
+/**
+ * @brief  Read a 16-bit value (2 bytes) from a BMP280 register.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  Register: Address of the register to read from.
+ * @retval uint16_t: Value read from the register.
+ */
 uint16_t Read16(BMP280_t *bmp, uint8_t Register)
 {
 	uint8_t Value[2];
-
 	HAL_I2C_Mem_Read(bmp->bmp_i2c, ((bmp->Address)<<1), Register, 1, Value, 2, BMP280_I2C_TIMEOUT);
-
 	return ((Value[1] << 8) | Value[0]);
 }
 
-//
-// Read 24 bits from BMP280 from Register
-//
+/**
+ * @brief  Read a 24-bit value (3 bytes) from a BMP280 register.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  Register: Address of the register to read from.
+ * @retval uint32_t: Value read from the register.
+ */
 uint32_t Read24(BMP280_t *bmp, uint8_t Register)
 {
 	uint8_t Value[3];
-
 	HAL_I2C_Mem_Read(bmp->bmp_i2c, ((bmp->Address)<<1), Register, 1, Value, 3, BMP280_I2C_TIMEOUT);
-
 	return ((Value[0] << 16) | (Value[1] << 8) | Value[2]);
 }
 
-//
-// Set mode - Forced or Normal - in Control register
-//
+// ============================================================================
+// Configuration Functions
+// ============================================================================
+
+/**
+ * @brief  Set the operating mode of the BMP280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  Mode: Operating mode (0: Sleep, 1-2: Forced, 3: Normal).
+ * @retval None
+ */
 void BMP280_SetMode(BMP280_t *bmp, uint8_t Mode)
 {
-	uint8_t Tmp;
+  uint8_t Tmp;
 
-	if(Mode > 3) Mode = 3;
+  if (Mode > 3) Mode = 3; // Limit mode to valid range (0-3).
 
-	Tmp = Read8(bmp, BMP280_CONTROL);
+  Tmp = Read8(bmp, BMP280_CONTROL);
+  Tmp &= 0xFC; // Clear last 2 bits (xxxx xx00).
+  Tmp |= (Mode & 0x03); // Set mode (forced/normal).
 
-	Tmp = Tmp & 0xFC; // Tmp (xxxx xx00)
-	Tmp |= Mode & 0x03;
-
-	Write8(bmp, BMP280_CONTROL, Tmp);
+  Write8(bmp, BMP280_CONTROL, Tmp);
 }
 
-//
-// Set pressure oversampling in Control register
-//
+/**
+ * @brief  Set pressure oversampling in the BMP280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  POversampling: Oversampling factor (0: Skip, 1-5: x1 to x16).
+ * @retval None
+ */
 void BMP280_SetPressureOversampling(BMP280_t *bmp, uint8_t POversampling)
 {
-	uint8_t Tmp;
+  uint8_t Tmp;
 
-	if(POversampling > 5) POversampling = 5;
+  if (POversampling > 5) POversampling = 5; // Limit oversampling to valid range (0-5).
 
-	Tmp = Read8(bmp, BMP280_CONTROL);
+  Tmp = Read8(bmp, BMP280_CONTROL);
+  Tmp &= 0xE3; // Clear bits 2-4 (xxx0 00xx).
+  Tmp |= ((POversampling << 2) & 0x1C); // Set pressure oversampling.
 
-	Tmp = Tmp & 0xE3; // Tmp (xxx0 00xx)
-	Tmp |= ((POversampling << 2) & 0x1C);  // (0001 1100)
-
-	Write8(bmp, BMP280_CONTROL, Tmp);
+  Write8(bmp, BMP280_CONTROL, Tmp);
 }
 
-//
-// Set temperature oversampling in Control register
-//
+/**
+ * @brief  Set temperature oversampling in the BMP280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  TOversampling: Oversampling factor (0: Skip, 1-5: x1 to x16).
+ * @retval None
+ */
 void BMP280_SetTemperatureOversampling(BMP280_t *bmp, uint8_t TOversampling)
 {
-	uint8_t Tmp;
+  uint8_t Tmp;
 
-	if(TOversampling > 5) TOversampling = 5;
+  if (TOversampling > 5) TOversampling = 5; // Limit oversampling to valid range (0-5).
 
-	Tmp = Read8(bmp, BMP280_CONTROL);
+  Tmp = Read8(bmp, BMP280_CONTROL);
+  Tmp &= 0x1F; // Clear bits 5-7 (000x xxxx).
+  Tmp |= ((TOversampling << 5) & 0xE0); // Set temperature oversampling.
 
-	Tmp = Tmp & 0x1F; // Tmp (000x xxxx)
-	Tmp |= ((TOversampling << 5) & 0xE0) ;  // (1110 0000)
-
-	Write8(bmp, BMP280_CONTROL, Tmp);
+  Write8(bmp, BMP280_CONTROL, Tmp);
 }
 
+/**
+ * @brief  Set humidity oversampling in the BME280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @param  HOversampling: Oversampling factor (0: Skip, 1-5: x1 to x16).
+ * @retval None
+ */
 void BMP280_SetHumidityOversampling(BMP280_t *bmp, uint8_t  HOversampling)
 {
-	uint8_t Tmp;
+  uint8_t Tmp;
 
-		if(HOversampling > 5) HOversampling = 5;
+  if (HOversampling > 5) HOversampling = 5; // Limit oversampling to valid range (0-5).
 
-		Tmp = Read8(bmp, BMP280_CONTROL_HUM);
+  Tmp = Read8(bmp, BMP280_CONTROL_HUM);
+  Tmp &= 0xF8; // Clear bits 0-2 (xxxx x000).
+  Tmp |= (HOversampling & 0x07); // Set humidity oversampling.
 
-		Tmp = Tmp & 0xF8; // Tmp (xxxx x000)
-		Tmp |= ((HOversampling) & 0x07) ;  // (0000 0111)
-
-		Write8(bmp, BMP280_CONTROL_HUM, Tmp);
+  Write8(bmp, BMP280_CONTROL_HUM, Tmp);
 }
 
-//
-// Read Raw temperature data from BMP280
-//
+// ============================================================================
+// Raw Data Reading Functions
+// ============================================================================
+
+/**
+ * @brief  Read raw temperature data from BMP280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @retval int32_t: Raw temperature data (20-bit value).
+ */
 int32_t BMP280_ReadTemperatureRaw(BMP280_t *bmp)
 {
-	int32_t Tmp;
-
-	Tmp = (int32_t)Read24(bmp, BMP280_TEMPDATA);
-
-	Tmp >>= 4; // Move 4 left due to such storing (Datasheet).
-
-	return Tmp;
+  int32_t Tmp = (int32_t) Read24 (bmp, BMP280_TEMPDATA);
+  Tmp >>= 4; // Adjust for 20-bit resolution.
+  return Tmp;
 }
 
-//
-// Read Raw pressure data from BMP280
-//
+/**
+ * @brief  Read raw pressure data from BMP280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @retval int32_t: Raw pressure data (20-bit value).
+ */
 int32_t BMP280_ReadPressureRaw(BMP280_t *bmp)
 {
-	int32_t Tmp;
-
-	Tmp = (int32_t)Read24(bmp, BMP280_PRESSUREDATA);
-
-	Tmp >>= 4; // Move 4 left due to such storing (Datasheet).
-
-	return Tmp;
+  int32_t Tmp = (int32_t) Read24 (bmp, BMP280_PRESSUREDATA);
+  Tmp >>= 4; // Adjust for 20-bit resolution.
+  return Tmp;
 }
 
-//
-// Read Raw humidity data from BMP280
-//
+/**
+ * @brief  Read raw humidity data from BME280.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @retval int16_t: Raw humidity data.
+ */
 int16_t BMP280_ReadHumidityRaw(BMP280_t *bmp)
 {
-	int16_t Tmp;
-
-	Tmp = Read16(bmp, BMP280_HUMDATA);
-
-	return Tmp;
+  return Read16(bmp, BMP280_HUMDATA);
 }
 
-//
-// Read and calculate temperature
-// Whole procedure is taken from BMP280 Datasheet
-//
+// ============================================================================
+// Sensor Data Calculation Functions
+// ============================================================================
+
+/**
+ * @brief  Calculate and return the actual temperature in °C.
+ * @param  bmp: Pointer to the BMP280_t structure (sensor instance).
+ * @retval float: Temperature in degrees Celsius.
+ */
 float BMP280_ReadTemperature(BMP280_t *bmp)
 {
 	int32_t var1, var2, T;
@@ -183,10 +212,8 @@ float BMP280_ReadTemperature(BMP280_t *bmp)
 	return (float)(T/100.0);
 }
 
-//
 // Read and calculate temperature & pressure
 // Whole procedure is taken from BMP280 Datasheet
-//
 uint8_t BMP280_ReadSensorData(BMP280_t *bmp, float *Pressure, float *Temperature, float *Humidity)
 {
 	// Have to read temperature first
@@ -251,9 +278,7 @@ uint8_t BMP280_ReadSensorData(BMP280_t *bmp, float *Pressure, float *Temperature
 }
 
 
-//
 // Init
-//
 uint8_t BMP280_Init(BMP280_t *bmp, I2C_HandleTypeDef *i2c, uint8_t Address)
 {
 	uint8_t ChipID;
@@ -294,6 +319,7 @@ uint8_t BMP280_Init(BMP280_t *bmp, I2C_HandleTypeDef *i2c, uint8_t Address)
 	bmp->h1 = Read8(bmp, BMP280_DIG_H1);
 	bmp->h2 = Read16(bmp, BMP280_DIG_H2);
 	bmp->h3 = Read8(bmp, BMP280_DIG_H3);
+	// Process special humidity calibration registers (BME280-specific).
 	dig_H4_msb = Read8(bmp, BMP280_DIG_H4_MSB);
 	dig_H4_lsb = Read8(bmp, BMP280_DIG_H4_LSB);
 	dig_H5_msb = Read8(bmp, BMP280_DIG_H5_MSB);
@@ -304,7 +330,7 @@ uint8_t BMP280_Init(BMP280_t *bmp, I2C_HandleTypeDef *i2c, uint8_t Address)
 	bmp->h5 = (int16_t)((((int8_t)dig_H5_lsb) << 4) | (dig_H5_msb  >>  4));
 
 
-	// Set base settings
+	// Configure default settings for the sensor.
 	BMP280_SetTemperatureOversampling(bmp, BMP280_ULTRAHIGHRES);
 	BMP280_SetPressureOversampling(bmp, BMP280_ULTRAHIGHRES);
 	BMP280_SetHumidityOversampling(bmp, BMP280_ULTRAHIGHRES);

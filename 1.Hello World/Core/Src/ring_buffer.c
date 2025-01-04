@@ -5,6 +5,10 @@
  *      Author: piotr
  */
 
+// IMPORTANT: Communication was required to test different scenarios involving time changes.
+// Afterward, debug mode was no longer needed. Furthermore, USB CDC interrupts caused issues
+// with UART communication, so it was temporarily disabled.
+
 #include "main.h"
 #include "ring_buffer.h"
 

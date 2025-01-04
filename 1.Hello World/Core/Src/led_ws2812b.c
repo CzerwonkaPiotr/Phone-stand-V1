@@ -3,19 +3,40 @@
  *
  *  Created on: Nov 5, 2024
  *      Author: piotr
+ *
+ *  This file provides driver functions for controlling an array of WS2812B (NeoPixel) LEDs.
+ *  It includes initialization, color setting, transition effects, and sequence control.
  */
 
 #include"led_ws2812b.h"
 
+// Defines the number of frames the LED update runs per second
+// and the total number of LEDs in the strip.
 #define LED_FRAMES_PER_SECOND 56
 #define NUMBER_OF_LEDS 15
 
+/*
+ * An array of neopixel_led structures, where each element holds the bit patterns
+ * for red, green, and blue channels of one LED. One extra is for the ending message.
+ */
 neopixel_led leds[NUMBER_OF_LEDS + 1];
 
+/*
+ * State variables used to track the current LED sequence, duration,
+ * the maximum steps for the sequence, the current step in the sequence,
+ * and the count for infinite loops (if any).
+ */
 static LED_SEQUENCE_POSITION_t processSequence;
 static LED_DURATION_POSITION_t processDuration;
-static uint16_t processMaxSteps, processStep, infiniteLoopCount, lightLevel; // lightLevel in %
-static uint8_t minute;
+static uint16_t processMaxSteps,  /* The total number of steps the current sequence will run */
+                 processStep,     /* The current step count in the running sequence */
+                 infiniteLoopCount, /* Counter for how many loops have been completed (infinite sequences) */
+                 lightLevel;      /* Light level expressed as a percentage (0–100) */
+static uint8_t  minute;           /* Used to select color variation based on minute or other logic */
+
+/*
+ * Predefined colors array. Each color is defined by its RGB components.
+ */
 static const rgb_color colors[] =
 {
 { 255, 0, 0 },      // 0 RED
@@ -32,6 +53,11 @@ static const rgb_color colors[] =
     { 255, 255, 255 }		// 11 WHITE
 
 };
+
+/*
+ * Lookup table for gamma correction or brightness compensation.
+ * Maps 8-bit values (0-255) to corrected 8-bit output values.
+ */
 static const uint8_t ledLookupTable[256] =
 { 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5,
     5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 12, 12, 12, 13, 13, 14, 14, 15, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 22,
@@ -41,6 +67,14 @@ static const uint8_t ledLookupTable[256] =
     148, 150, 151, 153, 155, 157, 159, 161, 163, 165, 166, 168, 170, 172, 174, 176, 178, 180, 182, 184, 186, 189, 191, 193, 195, 197, 199, 201, 204, 206, 208,
     210, 212, 215, 217, 219, 221, 224, 226, 228, 231, 233, 235, 238, 240, 243, 245, 248, 250, 253, 255 };
 
+
+/**
+ * @brief Resets (turns off) all LEDs in the given array.
+ *        This sets every bit for R, G, B channels to the logical zero pattern.
+ *
+ * @param[in] leds         Pointer to the LED array.
+ * @param[in] number_leds  Number of LEDs to reset.
+ */
 void LED_ResetAllLeds (neopixel_led *leds, uint16_t number_leds)
 {
   for (int i = 0; i < number_leds; i++)
@@ -54,6 +88,14 @@ void LED_ResetAllLeds (neopixel_led *leds, uint16_t number_leds)
   }
 
 }
+
+/**
+ * @brief Sets (turns on) all LEDs in the given array to maximum brightness (white).
+ *        This sets every bit for R, G, B channels to the logical one pattern.
+ *
+ * @param[in] leds         Pointer to the LED array.
+ * @param[in] number_leds  Number of LEDs to set.
+ */
 void LED_SetAllLeds (neopixel_led *leds, uint16_t number_leds)
 {
   for (int i = 0; i < number_leds; i++)
@@ -66,15 +108,23 @@ void LED_SetAllLeds (neopixel_led *leds, uint16_t number_leds)
     }
   }
 }
+
+/**
+ * @brief Sets a range of LEDs (from start_led to end_led) to a specified RGB color.
+ *
+ * @param[in] start_led  First LED in the range (inclusive).
+ * @param[in] end_led    Last LED in the range (inclusive).
+ * @param[in] color      Desired color in rgb_color format.
+ */
 void LED_SetColorForLeds (uint16_t start_led, uint16_t end_led, rgb_color color)
 {
-  // Check if LED range is valid
+  // Validate the LED range before proceeding
   if (start_led > end_led || end_led >= NUMBER_OF_LEDS || start_led < 0)
   {
     return; // Invalid range, exit the function
   }
 
-  // Iterate through the selected LEDs
+  // Set the color for each LED in the specified range
   for (uint16_t i = start_led; i <= end_led; i++)
   {
     // Set the red channel (R)
@@ -96,23 +146,39 @@ void LED_SetColorForLeds (uint16_t start_led, uint16_t end_led, rgb_color color)
     }
   }
 }
+
+/**
+ * @brief Initializes and starts an LED sequence based on the given parameters.
+ *
+ * @param[in] sequence        The sequence pattern (FADE, CIRCLE, SMOOTH, OFF).
+ * @param[in] duration        How long the sequence will run (3S, 5S, 10S, or INFINITE).
+ * @param[in] current_minute  Current minute or other time-based parameter (used for color selection).
+ *
+ * This function:
+ *   1. Updates the sequence and duration states.
+ *   2. Calculates the total number of steps based on the duration.
+ *   3. Reads from an ADC channel to determine the current ambient light level.
+ *   4. Starts the timer interrupt if needed, and sets the initial LED states.
+ */
 void LED_InitRunProcess (LED_SEQUENCE_POSITION_t sequence, LED_DURATION_POSITION_t duration, uint8_t current_minute)
 {
 
-  //Dont start process from 0 if it is going in a infinite loop.
+  // If we are already running an infinite loop, do not reset the process
   if (processDuration == DURATION_INFINITE && duration == DURATION_INFINITE)
   {
     return;
   }
 
+  // Update global process state
   processSequence = sequence;
   processDuration = duration;
   minute = current_minute;
   processStep = 0;
 
+  // If the sequence is set to OFF, stop the timer, turn off LEDs, and start DMA to apply changes
   if (processSequence == OFF_LED_SEQUENCE)
   {
-    //TURN OFF TIMER
+    // No steps needed for an off sequence
     processMaxSteps = 0;
     HAL_TIM_Base_Stop_IT (&htim4);
     LED_SetColorForLeds (0, NUMBER_OF_LEDS - 1, colors[10]);
@@ -120,6 +186,7 @@ void LED_InitRunProcess (LED_SEQUENCE_POSITION_t sequence, LED_DURATION_POSITION
     return;
   }
 
+  // Calculate the total number of steps for the selected duration
   if (processDuration == DURATION_3S)
   {
     processMaxSteps = 3 * LED_FRAMES_PER_SECOND;
@@ -134,10 +201,14 @@ void LED_InitRunProcess (LED_SEQUENCE_POSITION_t sequence, LED_DURATION_POSITION
   }
   else if (processDuration == DURATION_INFINITE)
   {
+    // Infinite loops run the same base steps but repeat forever
     processMaxSteps = 5 * LED_FRAMES_PER_SECOND;
   }
+
+  // Start the timer interrupt to update LEDs each frame
   HAL_TIM_Base_Start_IT (&htim4);
 
+  // Measure ambient light using ADC
   float tempVar;
   ADC_ChannelConfTypeDef sConfig =
   { 0 };
@@ -156,11 +227,25 @@ void LED_InitRunProcess (LED_SEQUENCE_POSITION_t sequence, LED_DURATION_POSITION
   }
   HAL_ADC_Stop (&hadc1);
 
+  // Convert raw ADC value (0–4095) to a percentage (0–100)
   tempVar = (float) lightLevel / (float) 4095;
   lightLevel = tempVar * 100;
+
+  // Ensure a minimum brightness of 5%
   if (lightLevel < 5) lightLevel = 5;
 }
 
+/**
+ * @brief Calculates the intermediate color in a transition from start_color to end_color.
+ *
+ * @param[in] start_color   The initial color for the transition.
+ * @param[in] end_color     The final color for the transition.
+ * @param[in] max_steps     The total number of steps in the transition.
+ * @param[in] current_step  The current step (0-based) in the transition.
+ * @return                  The RGB color corresponding to the current step.
+ *
+ * This function applies gamma correction to the interpolated color and scales it by the global lightLevel.
+ */
 rgb_color LED_CalculateTransitionColor (rgb_color start_color, rgb_color end_color, uint16_t max_steps, uint16_t current_step)
 {
   rgb_color result_color =
@@ -185,34 +270,86 @@ rgb_color LED_CalculateTransitionColor (rgb_color start_color, rgb_color end_col
   return result_color;
 }
 
+/**
+ * @brief Updates the LED sequence frame-by-frame and handles sequence completion.
+ *
+ * @return uint8_t
+ *         - 1 if the process is still running
+ *         - 0 if the process has finished (for non-infinite sequences)
+ *
+ * This function handles:
+ *   - FADE_LED_SEQUENCE: Fades from BLACK -> COLOR -> BLACK
+ *   - CIRCLE_LED_SEQUENCE: Cycles color around the strip
+ *   - SMOOTH_LED_SEQUENCE: Smoothly transitions through an array of colors
+ */
 uint8_t LED_RunProcess (void)
 {
   rgb_color calcColor;
+
+  // FADE sequence logic
   if (processSequence == FADE_LED_SEQUENCE)
   {
-    if (processStep < (processMaxSteps / 2)) calcColor = LED_CalculateTransitionColor (colors[10], colors[(minute + infiniteLoopCount) % 10],
-										       processMaxSteps / 2, processStep);
-    else if (processStep >= (processMaxSteps / 2)) calcColor = LED_CalculateTransitionColor (colors[(minute + infiniteLoopCount) % 10], colors[10],
-											     processMaxSteps / 2, processStep - (processMaxSteps / 2));
+    if (processStep < (processMaxSteps / 2))
+    {
+      calcColor = LED_CalculateTransitionColor (colors[10], colors[(minute + infiniteLoopCount) % 10],
+						processMaxSteps / 2, processStep);
+    }
+    else if (processStep >= (processMaxSteps / 2))
+    {
+      calcColor = LED_CalculateTransitionColor (colors[(minute + infiniteLoopCount) % 10],
+						colors[10], processMaxSteps / 2,
+						processStep - (processMaxSteps / 2));
+    }
+
+    // Apply the calculated color to all LEDs
     LED_SetColorForLeds (0, NUMBER_OF_LEDS - 1, calcColor);
     HAL_TIM_PWM_Start_DMA (&htim3, TIM_CHANNEL_2, (uint32_t*) leds, (NUMBER_OF_LEDS + 1) * 24);
   }
+
+  // CIRCLE sequence logic
   else if (processSequence == CIRCLE_LED_SEQUENCE)
   {
+    /*
+     * stepsPerLED: how many steps to keep a color on one LED
+     * before it moves on to the next LED in the strip.
+     */
     uint16_t stepsPerLED = processMaxSteps / (NUMBER_OF_LEDS + 3);
+
+    // The LED currently lit at this step
     uint16_t currentLED = processStep / stepsPerLED;
+
+    // Turn off an LED a few positions behind the current one
     LED_SetColorForLeds (currentLED - 3, currentLED - 3, colors[10]);
-    calcColor = LED_CalculateTransitionColor (colors[(minute + infiniteLoopCount) % 10], colors[10], stepsPerLED, processStep % stepsPerLED);
+
+    // Fade in the leading edge color
+    calcColor = LED_CalculateTransitionColor (colors[(minute + infiniteLoopCount) % 10], colors[10],
+					      stepsPerLED, processStep % stepsPerLED);
     LED_SetColorForLeds (currentLED - 2, currentLED - 2, calcColor);
-    calcColor = LED_CalculateTransitionColor (colors[10], colors[(minute + infiniteLoopCount) % 10], stepsPerLED, processStep % stepsPerLED);
+
+    // Fade in the new leading LED
+    calcColor = LED_CalculateTransitionColor (colors[10], colors[(minute + infiniteLoopCount) % 10],
+					      stepsPerLED, processStep % stepsPerLED);
     LED_SetColorForLeds (currentLED, currentLED, calcColor);
+
+    // Commit changes via DMA
     HAL_TIM_PWM_Start_DMA (&htim3, TIM_CHANNEL_2, (uint32_t*) leds, (NUMBER_OF_LEDS + 1) * 24);
   }
+
+  // SMOOTH sequence logic
   else if (processSequence == SMOOTH_LED_SEQUENCE)
   {
+    // Divide the total steps into segments for smooth transition through 11 colors
     uint16_t stepsPerColor = processMaxSteps / 11;
+
+    // Which color pair we are currently transitioning between
     uint16_t currentColor = processStep / stepsPerColor;
-    calcColor = LED_CalculateTransitionColor (colors[(currentColor + 10) % 11], colors[(currentColor + 11) % 11], stepsPerColor, processStep % stepsPerColor);
+
+    // Compute interpolated color
+    calcColor = LED_CalculateTransitionColor (colors[(currentColor + 10) % 11],
+					      colors[(currentColor + 11) % 11], stepsPerColor,
+					      processStep % stepsPerColor);
+
+    // Apply transition color to all LEDs
     LED_SetColorForLeds (0, NUMBER_OF_LEDS - 1, calcColor);
     HAL_TIM_PWM_Start_DMA (&htim3, TIM_CHANNEL_2, (uint32_t*) leds, (NUMBER_OF_LEDS + 1) * 24);
   }
@@ -221,19 +358,23 @@ uint8_t LED_RunProcess (void)
   {
     if (processDuration == DURATION_INFINITE)
     {
+      // Infinite sequences: increment loop count and reset steps
       infiniteLoopCount++;
       processStep = 0;
     }
     else
     {
+      // For finite sequences: reset, turn off LEDs, and stop the timer
       processStep = 0;
       infiniteLoopCount = 0;
-      LED_SetColorForLeds (0, NUMBER_OF_LEDS - 1, colors[10]);
+      LED_SetColorForLeds (0, NUMBER_OF_LEDS - 1, colors[10]); // Turn strip black
       HAL_TIM_PWM_Start_DMA (&htim3, TIM_CHANNEL_2, (uint32_t*) leds, (NUMBER_OF_LEDS + 1) * 24);
       HAL_TIM_Base_Stop_IT (&htim4);
-      return 0;
+      return 0; // Process finished
     }
   }
+
+  // Move to the next step and keep running
   processStep++;
   return 1; // process is ongoing
 }
